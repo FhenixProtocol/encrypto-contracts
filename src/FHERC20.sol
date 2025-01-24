@@ -3,14 +3,14 @@
 
 pragma solidity ^0.8.20;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Errors } from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
-import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Context } from "@openzeppelin/contracts/utils/Context.sol";
-import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import { Nonces } from "@openzeppelin/contracts/utils/Nonces.sol";
-import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -30,7 +30,14 @@ import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
  */
-abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP712, Nonces {
+abstract contract FHERC20 is
+    Context,
+    IERC20,
+    IERC20Metadata,
+    IERC20Errors,
+    EIP712,
+    Nonces
+{
     // NOTE: `indicatedBalances` are intended to indicate movement and change
     // of an encrypted FHERC20 balance, without exposing any encrypted data.
     //
@@ -61,7 +68,6 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
 
     uint256 private _totalSupply;
 
-    address private _erc20;
     string private _name;
     string private _symbol;
     uint8 private _decimals;
@@ -71,7 +77,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
 
     // TODO: <FHE INTEGRATION> Update `uint256 value` to be the `ct_hash` of the value to transfer
     bytes32 private constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
 
     /**
      * @dev Permit deadline has expired.
@@ -107,18 +115,27 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
     /**
      * @dev encTransferFrom `from` and `permit.owner` don't match
      */
-    error FHERC20EncTransferFromOwnerMismatch(address from, address permitOwner);
+    error FHERC20EncTransferFromOwnerMismatch(
+        address from,
+        address permitOwner
+    );
 
     /**
      * @dev encTransferFrom `to` and `permit.spender` don't match
      */
-    error FHERC20EncTransferFromSpenderMismatch(address to, address permitSpender);
+    error FHERC20EncTransferFromSpenderMismatch(
+        address to,
+        address permitSpender
+    );
 
     /**
      * @dev encTransferFrom `value` greater than `permit.permitValue`
      * TODO: Replace uint256 `value` with uint256 `ct_hash`
      */
-    error FHERC20EncTransferFromValueMismatch(uint256 value, uint256 permitValue);
+    error FHERC20EncTransferFromValueMismatch(
+        uint256 value,
+        uint256 permitValue
+    );
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -126,22 +143,16 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
      * All two of these values are immutable: they can only be set once during
      * construction.
      */
-    constructor(address erc20_, string memory name_, string memory symbol_, uint8 decimals_) EIP712(name_, "1") {
-        // TODO: Implement ERC20 validity checks here
-        _erc20 = erc20_;
-
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_
+    ) EIP712(name_, "1") {
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
 
         _indicatorOffset = 10 * 10 ** (decimals_ - 4);
-    }
-
-    /**
-     * @dev Returns the associated cleartext ERC20
-     */
-    function erc20() public view virtual returns (address) {
-        return _erc20;
     }
 
     /**
@@ -214,7 +225,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
      * @dev See {IERC20-balanceOf}.
      * TODO: Document
      */
-    function encBalanceOf(address account) public view virtual returns (uint256) {
+    function encBalanceOf(
+        address account
+    ) public view virtual returns (uint256) {
         // TODO: Switch this to returning the euint128 encrypted amount
         return _encBalances[account];
     }
@@ -228,7 +241,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
      * Can be returned without permit here because it was sealed with an unknown sealing key.
      * The sealed result leaks no data without the sealingKey pair privateKey
      */
-    function sealedBalanceOf(address account) public view virtual returns (uint256) {
+    function sealedBalanceOf(
+        address account
+    ) public view virtual returns (uint256) {
         // return FHE.sealoutputResult(_sealedBalances[account]);
     }
 
@@ -250,7 +265,10 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
      *
      * TODO: Replace uint256 cleartext value with inEuint128 encrypted value
      */
-    function encTransfer(address to, uint256 value) public virtual returns (bool) {
+    function encTransfer(
+        address to,
+        uint256 value
+    ) public virtual returns (bool) {
         address owner = _msgSender();
         _transfer(owner, to, value);
         return true;
@@ -260,7 +278,11 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
      * @dev See {IERC20-transferFrom}.
      * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20
      */
-    function transferFrom(address, address, uint256) public virtual returns (bool) {
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public pure returns (bool) {
         revert FHERC20IncompatibleFunction();
     }
 
@@ -289,14 +311,25 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
         uint256 value,
         FHERC20_EIP712_Permit calldata permit
     ) public virtual returns (bool) {
-        if (from != permit.owner) revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
-        if (to != permit.spender) revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
-        if (value != permit.value) revert FHERC20EncTransferFromValueMismatch(value, permit.value);
+        if (from != permit.owner)
+            revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
+        if (to != permit.spender)
+            revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
+        if (value != permit.value)
+            revert FHERC20EncTransferFromValueMismatch(value, permit.value);
 
-        if (block.timestamp > permit.deadline) revert ERC2612ExpiredSignature(permit.deadline);
+        if (block.timestamp > permit.deadline)
+            revert ERC2612ExpiredSignature(permit.deadline);
 
         bytes32 structHash = keccak256(
-            abi.encode(PERMIT_TYPEHASH, permit.owner, permit.spender, value, _useNonce(permit.owner), permit.deadline)
+            abi.encode(
+                PERMIT_TYPEHASH,
+                permit.owner,
+                permit.spender,
+                value,
+                _useNonce(permit.owner),
+                permit.deadline
+            )
         );
 
         bytes32 hash = _hashTypedDataV4(structHash);
@@ -330,7 +363,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
         _update(from, to, value);
     }
 
-    function _incrementIndicator(uint16 current) internal pure returns (uint16) {
+    function _incrementIndicator(
+        uint16 current
+    ) internal pure returns (uint16) {
         if (current == 0) return 5001;
         if (current < 9999) return current + 1;
         return current;
@@ -361,7 +396,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
             unchecked {
                 // Overflow not possible: value <= fromBalance <= totalSupply.
                 _encBalances[from] = fromBalance - value;
-                _indicatedBalances[from] = _decrementIndicator(_indicatedBalances[from]);
+                _indicatedBalances[from] = _decrementIndicator(
+                    _indicatedBalances[from]
+                );
             }
         }
 
@@ -374,7 +411,9 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
             unchecked {
                 // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
                 _encBalances[to] += value;
-                _indicatedBalances[from] = _incrementIndicator(_indicatedBalances[from]);
+                _indicatedBalances[from] = _incrementIndicator(
+                    _indicatedBalances[from]
+                );
             }
         }
 
@@ -430,25 +469,5 @@ abstract contract FHERC20 is Context, IERC20, IERC20Metadata, IERC20Errors, EIP7
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
         return _domainSeparatorV4();
-    }
-
-    // FHERC20 Specific Functionality
-
-    function _encryptHandleCleartextERC20(address from, uint256 value) internal virtual {
-        IERC20(_erc20).transferFrom(from, address(this), value);
-    }
-
-    function encrypt(address to, uint256 value) public virtual {
-        _encryptHandleCleartextERC20(msg.sender, value);
-        _mint(to, value);
-    }
-
-    function _decryptHandleCleartextERC20(address to, uint256 value) internal virtual {
-        IERC20(_erc20).transfer(to, value);
-    }
-
-    function decrypt(address to, uint256 value) public {
-        _burn(msg.sender, value);
-        _decryptHandleCleartextERC20(to, value);
     }
 }
