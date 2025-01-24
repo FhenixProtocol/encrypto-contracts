@@ -275,6 +275,26 @@ abstract contract FHERC20 is
     }
 
     /**
+     * @dev See {IERC20-allowance}.
+     * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20.
+     * Allowances have been removed from FHERC20s to prevent encrypted balance leakage.
+     * Allowances have been replaced with an EIP712 permit for each `encTransferFrom`.
+     */
+    function allowance(address, address) external pure returns (uint256) {
+        revert FHERC20IncompatibleFunction();
+    }
+
+    /**
+     * @dev See {IERC20-approve}.
+     * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20.
+     * Allowances have been removed from FHERC20s to prevent encrypted balance leakage.
+     * Allowances have been replaced with an EIP712 permit for each `encTransferFrom`.
+     */
+    function approve(address, uint256) external pure returns (bool) {
+        revert FHERC20IncompatibleFunction();
+    }
+
+    /**
      * @dev See {IERC20-transferFrom}.
      * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20
      */

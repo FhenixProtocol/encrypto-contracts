@@ -21,12 +21,12 @@ contract EncryptableWrappedFHERC20 is FHERC20 {
         FHERC20(
             string.concat(
                 "Fhenix Encrypted - ",
-                IERC20Metadata(address(_erc20)).name()
+                IERC20Metadata(address(erc20_)).name()
             ),
             bytes(symbolOverride_).length == 0
-                ? string.concat("e", IERC20Metadata(address(_erc20)).symbol())
+                ? string.concat("e", IERC20Metadata(address(erc20_)).symbol())
                 : symbolOverride_,
-            IERC20Metadata(address(_erc20)).decimals()
+            IERC20Metadata(address(erc20_)).decimals()
         )
     {
         if (erc20_ == this) {
