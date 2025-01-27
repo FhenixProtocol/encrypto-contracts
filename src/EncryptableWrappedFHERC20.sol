@@ -4,10 +4,12 @@
 pragma solidity ^0.8.20;
 
 import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20//ERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {FHERC20} from "./FHERC20.sol";
 
-contract EncryptableWrappedFHERC20 is FHERC20 {
+contract EncryptableWrappedFHERC20 is FHERC20, Ownable {
     IERC20 private immutable _erc20;
+    string private _symbol;
 
     /**
      * @dev The erc20 token couldn't be wrapped.
@@ -18,6 +20,7 @@ contract EncryptableWrappedFHERC20 is FHERC20 {
         IERC20 erc20_,
         string memory symbolOverride_
     )
+        Ownable(msg.sender)
         FHERC20(
             string.concat(
                 "Fhenix Encrypted - ",
@@ -33,6 +36,18 @@ contract EncryptableWrappedFHERC20 is FHERC20 {
             revert FHERC20InvalidErc20(address(this));
         }
         _erc20 = erc20_;
+
+        _symbol = bytes(symbolOverride_).length == 0
+            ? string.concat("e", IERC20Metadata(address(erc20_)).symbol())
+            : symbolOverride_;
+    }
+
+    function symbol() public view override returns (string memory) {
+        return _symbol;
+    }
+
+    function updateSymbol(string memory updatedSymbol) public onlyOwner {
+        _symbol = updatedSymbol;
     }
 
     /**
