@@ -6,12 +6,12 @@ pragma solidity ^0.8.20;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {FHERC20} from "./FHERC20.sol";
 
-contract FHED is FHERC20, AccessControl {
+contract FUSD is FHERC20, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER");
     error CallerNotMinter(address caller);
 
-    constructor(address fhedVault_) FHERC20("FHE Dollar", "FHED", 6) {
-        _grantRole(MINTER_ROLE, fhedVault_);
+    constructor(address fusdVault_) FHERC20("FHE Dollar", "FHED", 6) {
+        _grantRole(MINTER_ROLE, fusdVault_);
     }
 
     function mint(address receiver, uint256 amount) external returns (bool) {
