@@ -34,12 +34,10 @@ contract EncryptoCore is Ownable {
     }
 
     function updateFherc20Symbol(
-        address fherc20,
+        EncryptableWrappedFHERC20 fherc20,
         string memory updatedSymbol
-    ) public onlyOwner fherc20Deployed(erc20) {
-        EncryptableWrappedFHERC20(_fherc20Map[address(erc20)]).updateSymbol(
-            updatedSymbol
-        );
+    ) public onlyOwner {
+        fherc20.updateSymbol(updatedSymbol);
     }
 
     function deployFherc20(IERC20 erc20) public fherc20NotDeployed(erc20) {
@@ -63,6 +61,8 @@ contract EncryptoCore is Ownable {
     ) public fherc20Deployed(erc20) {
         _encrypt(erc20, to, value);
     }
+
+    function encryptNative(address to) public payable {}
 
     function decrypt(
         IERC20 erc20,

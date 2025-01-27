@@ -7,7 +7,7 @@ import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {FHERC20} from "./FHERC20.sol";
 
-contract EncryptableWrappedFHERC20 is FHERC20, Ownable {
+contract ConfidentialERC20 is FHERC20, Ownable {
     IERC20 private immutable _erc20;
     string private _symbol;
 
@@ -23,7 +23,7 @@ contract EncryptableWrappedFHERC20 is FHERC20, Ownable {
         Ownable(msg.sender)
         FHERC20(
             string.concat(
-                "Fhenix Encrypted - ",
+                "Confidential ",
                 IERC20Metadata(address(erc20_)).name()
             ),
             bytes(symbolOverride_).length == 0
