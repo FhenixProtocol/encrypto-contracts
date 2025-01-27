@@ -5,88 +5,57 @@ pragma solidity ^0.8.20;
 
 import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20//ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {EncryptableWrappedFHERC20} from "./EncryptableWrappedFHERC20.sol";
+import {ConfidentialERC20} from "./ConfidentialERC20.sol";
+import {ConfidentialETH} from "./ConfidentialETH.sol";
+import {IWETH} from "./interfaces/IWETH.sol";
 
 contract EncryptoCore is Ownable {
     mapping(address erc20 => address fherc20) private _fherc20Map;
 
+    // Confidential ETH :: ETH / wETH deposited into Encrypto are routed to cETH
+    IWETH public wETH;
+    ConfidentialETH public cETH;
+
+    // Stablecoins :: deposited stablecoins are routed to FUSD
+    mapping(address erc20 => bool isStablecoin) public _stablecoins;
+
     constructor() Ownable(msg.sender) {}
 
-    error EncryptoFherc20AlreadyDeployed();
-    error EncryptoFherc20NotDeployed();
+    error Invalid_AlreadyDeployed();
+    error Invalid_Stablecoin();
+    error Invalid_WETH();
 
-    modifier fherc20Deployed(IERC20 erc20) {
-        if (_fherc20Map[address(erc20)] == address(0)) {
-            revert EncryptoFherc20NotDeployed();
-        }
-        _;
-    }
-
-    modifier fherc20NotDeployed(IERC20 erc20) {
-        if (_fherc20Map[address(erc20)] == address(0)) {
-            revert EncryptoFherc20AlreadyDeployed();
-        }
-        _;
+    function updateStablecoin(
+        address stablecoin,
+        bool isStablecoin
+    ) public onlyOwner {
+        _stablecoins[stablecoin] = isStablecoin;
     }
 
     function getFherc20(address erc20) public view returns (address) {
         return _fherc20Map[erc20];
     }
 
+    function getIsStablecoin(address erc20) public view returns (bool) {
+        return _stablecoins[erc20];
+    }
+
     function updateFherc20Symbol(
-        EncryptableWrappedFHERC20 fherc20,
+        ConfidentialERC20 fherc20,
         string memory updatedSymbol
     ) public onlyOwner {
         fherc20.updateSymbol(updatedSymbol);
     }
 
-    function deployFherc20(IERC20 erc20) public fherc20NotDeployed(erc20) {
-        _deployFherc20(erc20);
-    }
+    function deployFherc20(IERC20 erc20) public {
+        if (_fherc20Map[address(erc20)] == address(0))
+            revert Invalid_AlreadyDeployed();
 
-    function deployAndEncrypt(
-        IERC20 erc20,
-        address to,
-        uint256 value
-    ) public fherc20NotDeployed(erc20) {
-        if (_fherc20Map[address(erc20)] == address(0)) _deployFherc20(erc20);
+        if (_stablecoins[address(erc20)]) revert Invalid_Stablecoin();
 
-        _encrypt(erc20, to, value);
-    }
+        if (address(erc20) == address(wETH)) revert Invalid_WETH();
 
-    function encrypt(
-        IERC20 erc20,
-        address to,
-        uint256 value
-    ) public fherc20Deployed(erc20) {
-        _encrypt(erc20, to, value);
-    }
-
-    function encryptNative(address to) public payable {}
-
-    function decrypt(
-        IERC20 erc20,
-        address to,
-        uint256 value
-    ) public fherc20Deployed(erc20) {
-        EncryptableWrappedFHERC20(_fherc20Map[address(erc20)]).decrypt(
-            to,
-            value
-        );
-    }
-
-    function _deployFherc20(IERC20 erc20) internal {
-        EncryptableWrappedFHERC20 fherc20 = new EncryptableWrappedFHERC20(
-            erc20,
-            ""
-        );
+        ConfidentialERC20 fherc20 = new ConfidentialERC20(erc20, "");
         _fherc20Map[address(erc20)] = address(fherc20);
-    }
-
-    function _encrypt(IERC20 erc20, address to, uint256 value) internal {
-        EncryptableWrappedFHERC20(_fherc20Map[address(erc20)]).encrypt(
-            to,
-            value
-        );
     }
 }
