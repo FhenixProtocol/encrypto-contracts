@@ -57,27 +57,13 @@ contract EncryptableWrappedFHERC20 is FHERC20, Ownable {
         return _erc20;
     }
 
-    function _encryptHandleCleartextERC20(
-        address from,
-        uint256 value
-    ) internal virtual {
-        IERC20(_erc20).transferFrom(from, address(this), value);
-    }
-
-    function encrypt(address to, uint256 value) public virtual {
-        _encryptHandleCleartextERC20(msg.sender, value);
+    function encrypt(address to, uint256 value) public {
+        IERC20(_erc20).transferFrom(msg.sender, address(this), value);
         _mint(to, value);
-    }
-
-    function _decryptHandleCleartextERC20(
-        address to,
-        uint256 value
-    ) internal virtual {
-        IERC20(_erc20).transfer(to, value);
     }
 
     function decrypt(address to, uint256 value) public {
         _burn(msg.sender, value);
-        _decryptHandleCleartextERC20(to, value);
+        IERC20(_erc20).transfer(to, value);
     }
 }
