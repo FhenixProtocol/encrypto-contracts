@@ -12,6 +12,8 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
+import {console} from "forge-std/Test.sol";
+
 /**
  * @dev Implementation of the {IERC20} interface.
  *
@@ -71,7 +73,7 @@ abstract contract FHERC20 is
     string private _name;
     string private _symbol;
     uint8 private _decimals;
-    uint256 private _indicatorOffset;
+    uint256 private _indicatorTick;
 
     // EIP712 Permit
 
@@ -152,7 +154,7 @@ abstract contract FHERC20 is
         _symbol = symbol_;
         _decimals = decimals_;
 
-        _indicatorOffset = 10 * 10 ** (decimals_ - 4);
+        _indicatorTick = 10 ** (decimals_ - 4);
     }
 
     /**
@@ -208,6 +210,13 @@ abstract contract FHERC20 is
     }
 
     /**
+     * @dev Returns the true size of the indicator tick
+     */
+    function indicatorTick() public view returns (uint256) {
+        return _indicatorTick;
+    }
+
+    /**
      * @dev Returns an indicator of the underlying encrypted balance.
      * The value returned is [0](no interaction) / [0.0001 - 0.9999](indicated)
      * Indicator acts as a counter of tokens transfers and changes.
@@ -218,7 +227,7 @@ abstract contract FHERC20 is
      * Returned in the decimal expectation of the token.
      */
     function balanceOf(address account) public view virtual returns (uint256) {
-        return _indicatedBalances[account] * 10 ** (decimals() - 4);
+        return _indicatedBalances[account] * _indicatorTick;
     }
 
     /**
@@ -431,13 +440,13 @@ abstract contract FHERC20 is
             unchecked {
                 // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
                 _encBalances[to] += value;
-                _indicatedBalances[from] = _incrementIndicator(
-                    _indicatedBalances[from]
+                _indicatedBalances[to] = _incrementIndicator(
+                    _indicatedBalances[to]
                 );
             }
         }
 
-        emit Transfer(from, to, _indicatorOffset);
+        emit Transfer(from, to, _indicatorTick);
     }
 
     /**
