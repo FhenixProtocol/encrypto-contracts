@@ -38,7 +38,7 @@ contract SigUtils {
     function getTypedDataHash(
         bytes32 _DOMAIN_SEPARATOR,
         Permit memory _permit
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(

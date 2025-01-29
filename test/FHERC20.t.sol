@@ -210,14 +210,16 @@ contract FHERC20Test is Test, IERC20Errors {
         uint256 privateKey,
         address owner,
         address spender,
-        uint256 value
+        uint256 value,
+        uint256 nonce,
+        uint256 deadline
     ) public view returns (FHERC20.FHERC20_EIP712_Permit memory permit) {
         SigUtils.Permit memory sigUtilsPermit = SigUtils.Permit({
             owner: owner,
             spender: spender,
             value: value,
-            nonce: token.nonces(owner),
-            deadline: 1 days
+            nonce: nonce,
+            deadline: block.timestamp + deadline
         });
 
         bytes32 digest = sigUtils.getTypedDataHash(
@@ -231,11 +233,29 @@ contract FHERC20Test is Test, IERC20Errors {
             owner: owner,
             spender: spender,
             value: value,
-            deadline: 1 days,
+            deadline: block.timestamp + deadline,
             v: v,
             r: r,
             s: s
         });
+    }
+
+    function generateTransferFromPermit(
+        FHERC20 token,
+        uint256 privateKey,
+        address owner,
+        address spender,
+        uint256 value
+    ) public view returns (FHERC20.FHERC20_EIP712_Permit memory permit) {
+        permit = generateTransferFromPermit(
+            token,
+            privateKey,
+            owner,
+            spender,
+            value,
+            token.nonces(owner),
+            1 days
+        );
     }
 
     // TESTS
@@ -455,10 +475,107 @@ contract FHERC20Test is Test, IERC20Errors {
     }
 
     function test_EncTransferFrom_PermitReversions() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        FHERC20.FHERC20_EIP712_Permit memory permit;
+
+        // Valid
+
+        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        XXX.encTransferFrom(bob, alice, 1e18, permit);
+
         // Deadline passed - ERC2612ExpiredSignature
-        // FHERC20EncTransferFromOwnerMismatch
+
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            1e18,
+            XXX.nonces(bob),
+            0
+        );
+        vm.warp(block.timestamp + 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.ERC2612ExpiredSignature.selector,
+                permit.deadline
+            )
+        );
+        XXX.encTransferFrom(bob, alice, 1e18, permit);
+
+        // FHERC20EncTransferFromOwnerMismatch bob -> eve
+
+        permit = generateTransferFromPermit(XXX, bobPK, eve, alice, 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.FHERC20EncTransferFromOwnerMismatch.selector,
+                bob,
+                eve
+            )
+        );
+        XXX.encTransferFrom(bob, alice, 1e18, permit);
+
+        // FHERC20EncTransferFromOwnerMismatch eve -> bob
+
+        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.FHERC20EncTransferFromOwnerMismatch.selector,
+                eve,
+                bob
+            )
+        );
+        XXX.encTransferFrom(eve, alice, 1e18, permit);
+
         // FHERC20EncTransferFromSpenderMismatch
+
+        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.FHERC20EncTransferFromSpenderMismatch.selector,
+                eve,
+                alice
+            )
+        );
+        XXX.encTransferFrom(bob, eve, 1e18, permit);
+
         // FHERC20EncTransferFromValueMismatch
+
+        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.FHERC20EncTransferFromValueMismatch.selector,
+                2e18,
+                1e18
+            )
+        );
+        XXX.encTransferFrom(bob, alice, 2e18, permit);
+
+        // Signer != owner - ERC2612InvalidSigner
+
+        permit = generateTransferFromPermit(XXX, alicePK, bob, alice, 1e18);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FHERC20.ERC2612InvalidSigner.selector,
+                alice,
+                bob
+            )
+        );
+        XXX.encTransferFrom(bob, alice, 1e18, permit);
+
         // Invalid nonce - ERC2612InvalidSigner
+
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            1e18,
+            XXX.nonces(bob) - 1,
+            1 days
+        );
+        vm.expectPartialRevert(FHERC20.ERC2612InvalidSigner.selector);
+        XXX.encTransferFrom(bob, alice, 1e18, permit);
     }
 }

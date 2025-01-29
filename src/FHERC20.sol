@@ -340,15 +340,15 @@ abstract contract FHERC20 is
         uint256 value,
         FHERC20_EIP712_Permit calldata permit
     ) public virtual returns (bool) {
+        if (block.timestamp > permit.deadline)
+            revert ERC2612ExpiredSignature(permit.deadline);
+
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
         if (to != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
         if (value != permit.value)
             revert FHERC20EncTransferFromValueMismatch(value, permit.value);
-
-        if (block.timestamp > permit.deadline)
-            revert ERC2612ExpiredSignature(permit.deadline);
 
         bytes32 structHash = keccak256(
             abi.encode(
