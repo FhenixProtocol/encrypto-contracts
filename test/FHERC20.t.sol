@@ -277,6 +277,8 @@ contract FHERC20Test is Test, IERC20Errors {
     }
 
     function test_Mint() public {
+        assertEq(XXX.totalSupply(), 0, "Total supply init 0");
+
         // 1st TX, indicated + 5001, true + 1e18
 
         uint256 value = 1e18;
@@ -293,6 +295,8 @@ contract FHERC20Test is Test, IERC20Errors {
             int256(value)
         );
 
+        assertEq(XXX.totalSupply(), value, "Total supply increases");
+
         // 2nd TX, indicated + 1, true + 1e18
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
@@ -306,12 +310,19 @@ contract FHERC20Test is Test, IERC20Errors {
             _ticksToIndicated(XXX, 1),
             int256(value)
         );
+
+        // Revert
+
+        vm.expectPartialRevert(ERC20InvalidReceiver.selector);
+        XXX.mint(address(0), value);
     }
 
     function test_Burn() public {
         XXX.mint(bob, 10e18);
 
         // 1st TX, indicated - 1, true - 1e18
+
+        assertEq(XXX.totalSupply(), 10e18, "Total supply init 10e18");
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
 
@@ -324,6 +335,13 @@ contract FHERC20Test is Test, IERC20Errors {
             -1 * _ticksToIndicated(XXX, 1),
             -1 * 1e18
         );
+
+        assertEq(XXX.totalSupply(), 9e18, "Total supply reduced by 1e18");
+
+        // Revert
+
+        vm.expectPartialRevert(ERC20InvalidSender.selector);
+        XXX.burn(address(0), 1e18);
     }
 
     function test_ERC20FunctionsRevert() public {
