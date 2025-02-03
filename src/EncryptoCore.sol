@@ -40,6 +40,10 @@ contract EncryptoCore is Ownable {
         return _stablecoins[erc20];
     }
 
+    function getIsWETH(address erc20) public view returns (bool) {
+        return erc20 == address(wETH);
+    }
+
     function updateFherc20Symbol(
         ConfidentialERC20 fherc20,
         string memory updatedSymbol
@@ -52,7 +56,6 @@ contract EncryptoCore is Ownable {
             revert Invalid_AlreadyDeployed();
 
         if (_stablecoins[address(erc20)]) revert Invalid_Stablecoin();
-
         if (address(erc20) == address(wETH)) revert Invalid_WETH();
 
         ConfidentialERC20 fherc20 = new ConfidentialERC20(erc20, "");
