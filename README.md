@@ -2,6 +2,21 @@
 
 **FHERC20 standard + Encrypto Contracts (FHED / EncryptableWrappedFHERC20)**
 
+Contracts (src)
+
+Standards:
+FHERC20.sol (The full FHERC20 without FHE included, for testing EIP712 / indicated balances. Documented in FHERC20.md)
+FHERC20wFHE.sol (FHERC20.sol + FHE operations)
+FHERC20wFHEUpgradeable.sol (FHERC20wFHE.sol + Upgradeability)
+interfaces/IFHERC20.sol
+interfaces/IFHERC20Errors.sol
+
+Encrypto:
+EncryptoCore.sol (Routing tokens to their encrypted counterpart)
+ConfidentialERC20.sol (FHERC20 wrapper around ERC20 with `encrypt` and `decrypt` functionality)
+ConfidentialETH.sol (ConfidentialERC20.sol + native ETH -> eETH `encrypt`ing)
+FUSD.sol (FHERC20.sol + `mint` and `burn` integration with Paxos)
+
 ---
 
 ### Foundry
