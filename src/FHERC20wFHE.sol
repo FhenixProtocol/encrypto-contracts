@@ -84,6 +84,8 @@ abstract contract FHERC20 is
     mapping(address account => mapping(bytes32 sealingKey => string sealedResult))
         private _sealedResults;
 
+    uint256 SEALOUTPUT_PENDING = keccak256(bytes("SEALOUTPUT_PENDING"));
+
     // EIP712 Permit
 
     bytes32 private constant PERMIT_TYPEHASH =
@@ -205,6 +207,9 @@ abstract contract FHERC20 is
         _sealingRequests[msg.sender][
             euint128.unwrap(_encBalances[account])
         ] = SealingRequest({account: account, sealingKey: sealingKey});
+        _sealedResults[request.account][
+            request.sealingKey
+        ] = SEALOUTPUT_PENDING;
     }
 
     /**
@@ -233,7 +238,13 @@ abstract contract FHERC20 is
         address account,
         bytes32 sealingKey
     ) public view virtual returns (SealedUint memory result) {
-        result.data = _sealedResults[account][sealingKey];
+        string memory resultData = _sealedResults[account][sealingKey];
+
+        if (bytes(result).length == 0) revert FHERC20SealedResultNotRequested();
+        if (keccak256(bytes(resultData)) == SEALOUTPUT_PENDING)
+            revert FHERC20SealedResultPending();
+
+        result.data = resultData;
         result.utype = Utils.EUINT128_TFHE;
     }
 
