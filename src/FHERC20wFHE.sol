@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v5.1.0) (token/ERC20/ERC20.sol)
 
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.25;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,9 +11,9 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IFHERC20} from "./interfaces/IFHERC20.sol";
+import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
 import "@fhenixprotocol/cofhe-contracts/FHE.sol";
-
-import {console} from "forge-std/Test.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -37,10 +37,9 @@ import {console} from "forge-std/Test.sol";
  * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
 abstract contract FHERC20 is
+    IFHERC20,
+    IFHERC20Errors,
     Context,
-    IERC20,
-    IERC20Metadata,
-    IERC20Errors,
     EIP712,
     Nonces,
     IAsyncFHEReceiver
@@ -80,10 +79,6 @@ abstract contract FHERC20 is
     uint8 private _decimals;
     uint256 private _indicatorTick;
 
-    struct SealingRequest {
-        address account;
-        bytes32 sealingKey;
-    }
     mapping(address account => mapping(uint256 ct_hash => SealingRequest request))
         private _sealingRequests;
     mapping(address account => mapping(bytes32 sealingKey => string sealedResult))
@@ -95,61 +90,6 @@ abstract contract FHERC20 is
         keccak256(
             "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
         );
-
-    /**
-     * @dev Permit deadline has expired.
-     */
-    error ERC2612ExpiredSignature(uint256 deadline);
-
-    /**
-     * @dev Mismatched signature.
-     */
-    error ERC2612InvalidSigner(address signer, address owner);
-
-    /**
-     * @dev EIP712 Permit reusable struct
-     */
-    struct FHERC20_EIP712_Permit {
-        address owner;
-        address spender;
-        uint256 value_hash;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    // FHERC20
-
-    /**
-     * @dev Indicates an incompatible function being called.
-     * Prevents unintentional treatment of an FHERC20 as a cleartext ERC20
-     */
-    error FHERC20IncompatibleFunction();
-
-    /**
-     * @dev encTransferFrom `from` and `permit.owner` don't match
-     */
-    error FHERC20EncTransferFromOwnerMismatch(
-        address from,
-        address permitOwner
-    );
-
-    /**
-     * @dev encTransferFrom `to` and `permit.spender` don't match
-     */
-    error FHERC20EncTransferFromSpenderMismatch(
-        address to,
-        address permitSpender
-    );
-
-    /**
-     * @dev encTransferFrom `value` greater than `permit.permitValue`
-     */
-    error FHERC20EncTransferFromValueMismatch(
-        uint256 inValueHash,
-        uint256 permitValueHash
-    );
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -365,9 +305,6 @@ abstract contract FHERC20 is
      * - `from` must have a balance of at least `value`.
      * - the caller must have allowance for ``from``'s tokens of at least
      * `value`.
-     *
-     * TODO: Replace uint256 cleartext value with inEuint128 encrypted value
-     * TODO: Replace `value` and `permit.value` comparison with `ct_hash` matching (no FHE op comparison)
      */
     function encTransferFrom(
         address from,

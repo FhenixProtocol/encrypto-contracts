@@ -5,7 +5,7 @@ libs = ['lib']
 test = 'test'
 script = 'script'
 cache_path  = 'cache_forge'
-solc = '0.8.20'
+solc = '0.8.25'
 optimizer = true
 optimizer-runs = 200
 fs_permissions = [{ access = "read-write", path = "./data" }]
