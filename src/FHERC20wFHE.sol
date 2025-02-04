@@ -12,6 +12,8 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
+import {console} from "forge-std/Test.sol";
+
 /**
  * @dev Implementation of the {IERC20} interface.
  *
@@ -29,8 +31,11 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * instead returning `false` on failure. This behavior is nonetheless
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
+ *
+ * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
+ * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
-abstract contract FHERC20wFHE is
+abstract contract FHERC20 is
     Context,
     IERC20,
     IERC20Metadata,
@@ -71,7 +76,7 @@ abstract contract FHERC20wFHE is
     string private _name;
     string private _symbol;
     uint8 private _decimals;
-    uint256 private _indicatorOffset;
+    uint256 private _indicatorTick;
 
     // EIP712 Permit
 
@@ -152,7 +157,7 @@ abstract contract FHERC20wFHE is
         _symbol = symbol_;
         _decimals = decimals_;
 
-        _indicatorOffset = 10 * 10 ** (decimals_ - 4);
+        _indicatorTick = 10 ** (decimals_ - 4);
     }
 
     /**
@@ -208,6 +213,13 @@ abstract contract FHERC20wFHE is
     }
 
     /**
+     * @dev Returns the true size of the indicator tick
+     */
+    function indicatorTick() public view returns (uint256) {
+        return _indicatorTick;
+    }
+
+    /**
      * @dev Returns an indicator of the underlying encrypted balance.
      * The value returned is [0](no interaction) / [0.0001 - 0.9999](indicated)
      * Indicator acts as a counter of tokens transfers and changes.
@@ -218,7 +230,7 @@ abstract contract FHERC20wFHE is
      * Returned in the decimal expectation of the token.
      */
     function balanceOf(address account) public view virtual returns (uint256) {
-        return _indicatedBalances[account] * 10 ** (decimals() - 4);
+        return _indicatedBalances[account] * _indicatorTick;
     }
 
     /**
@@ -309,12 +321,6 @@ abstract contract FHERC20wFHE is
     /**
      * @dev See {IERC20-transferFrom}.
      *
-     * Skips emitting an {Approval} event indicating an allowance update. This is not
-     * required by the ERC. See {xref-ERC20-_approve-address-address-uint256-bool-}[_approve].
-     *
-     * NOTE: Does not update the allowance if the current allowance
-     * is the maximum `uint256`.
-     *
      * Requirements:
      *
      * - `from` and `to` cannot be the zero address.
@@ -331,15 +337,15 @@ abstract contract FHERC20wFHE is
         uint256 value,
         FHERC20_EIP712_Permit calldata permit
     ) public virtual returns (bool) {
+        if (block.timestamp > permit.deadline)
+            revert ERC2612ExpiredSignature(permit.deadline);
+
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
         if (to != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
         if (value != permit.value)
             revert FHERC20EncTransferFromValueMismatch(value, permit.value);
-
-        if (block.timestamp > permit.deadline)
-            revert ERC2612ExpiredSignature(permit.deadline);
 
         bytes32 structHash = keccak256(
             abi.encode(
@@ -383,6 +389,9 @@ abstract contract FHERC20wFHE is
         _update(from, to, value);
     }
 
+    /*
+     * @dev Increments a user's balance indicator by 0.0001
+     */
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
@@ -391,6 +400,9 @@ abstract contract FHERC20wFHE is
         return current;
     }
 
+    /*
+     * @dev Decrements a user's balance indicator by 0.0001
+     */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
         if (value == 0) return 4999;
         if (value > 1) return value - 1;
@@ -431,13 +443,13 @@ abstract contract FHERC20wFHE is
             unchecked {
                 // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
                 _encBalances[to] += value;
-                _indicatedBalances[from] = _incrementIndicator(
-                    _indicatedBalances[from]
+                _indicatedBalances[to] = _incrementIndicator(
+                    _indicatedBalances[to]
                 );
             }
         }
 
-        emit Transfer(from, to, _indicatorOffset);
+        emit Transfer(from, to, _indicatorTick);
     }
 
     /**

@@ -31,6 +31,9 @@ import {console} from "forge-std/Test.sol";
  * instead returning `false` on failure. This behavior is nonetheless
  * conventional and does not conflict with the expectations of ERC-20
  * applications.
+ *
+ * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
+ * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
 abstract contract FHERC20 is
     Context,
@@ -318,12 +321,6 @@ abstract contract FHERC20 is
     /**
      * @dev See {IERC20-transferFrom}.
      *
-     * Skips emitting an {Approval} event indicating an allowance update. This is not
-     * required by the ERC. See {xref-ERC20-_approve-address-address-uint256-bool-}[_approve].
-     *
-     * NOTE: Does not update the allowance if the current allowance
-     * is the maximum `uint256`.
-     *
      * Requirements:
      *
      * - `from` and `to` cannot be the zero address.
@@ -392,6 +389,9 @@ abstract contract FHERC20 is
         _update(from, to, value);
     }
 
+    /*
+     * @dev Increments a user's balance indicator by 0.0001
+     */
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
@@ -400,6 +400,9 @@ abstract contract FHERC20 is
         return current;
     }
 
+    /*
+     * @dev Decrements a user's balance indicator by 0.0001
+     */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
         if (value == 0) return 4999;
         if (value > 1) return value - 1;
