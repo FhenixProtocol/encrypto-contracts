@@ -262,10 +262,9 @@ abstract contract FHERC20 is
      */
     function sealBalanceOf(address account, bytes32 sealingKey) public virtual {
         FHE.sealoutput(_encBalances[account], sealingKey);
-        _sealingRequests[msg.sender][_encBalances[account]] = SealingRequest({
-            account: account,
-            sealingKey: sealingKey
-        });
+        _sealingRequests[msg.sender][
+            euint128.unwrap(_encBalances[account])
+        ] = SealingRequest({account: account, sealingKey: sealingKey});
     }
 
     /**
