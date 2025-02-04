@@ -51,6 +51,16 @@ interface IFHERC20 is IERC20, IERC5267, IERC20Metadata {
     }
 
     /**
+     * @dev Emitted when `handleSealOutputResult` called by CoFHE coprocessor with seal output result
+     */
+    event FHERC20SealedResultReady(
+        address indexed account,
+        bytes32 sealingKey,
+        uint256 ctHash,
+        string result
+    );
+
+    /**
      * @dev Returns the name of the token.
      */
     function name() external view returns (string memory);
