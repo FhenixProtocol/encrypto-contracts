@@ -11,6 +11,7 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -41,7 +42,8 @@ abstract contract FHERC20 is
     IERC20Metadata,
     IERC20Errors,
     EIP712,
-    Nonces
+    Nonces,
+    IAsyncFHEReceiver
 {
     // NOTE: `indicatedBalances` are intended to indicate movement and change
     // of an encrypted FHERC20 balance, without exposing any encrypted data.
@@ -69,7 +71,7 @@ abstract contract FHERC20 is
     // to indicate change when the real encrypted change is not yet implemented
     // in infrastructure like wallets and etherscans.
     mapping(address account => uint16) private _indicatedBalances;
-    mapping(address account => uint256) private _encBalances;
+    mapping(address account => euint128) private _encBalances;
 
     uint256 private _totalSupply;
 
@@ -78,12 +80,20 @@ abstract contract FHERC20 is
     uint8 private _decimals;
     uint256 private _indicatorTick;
 
+    struct SealingRequest {
+        address account;
+        bytes32 sealingKey;
+    }
+    mapping(address account => mapping(uint256 ct_hash => SealingRequest request))
+        private _sealingRequests;
+    mapping(address account => mapping(bytes32 sealingKey => string sealedResult))
+        private _sealedResults;
+
     // EIP712 Permit
 
-    // TODO: <FHE INTEGRATION> Update `uint256 value` to be the `ct_hash` of the value to transfer
     bytes32 private constant PERMIT_TYPEHASH =
         keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+            "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
         );
 
     /**
@@ -102,7 +112,7 @@ abstract contract FHERC20 is
     struct FHERC20_EIP712_Permit {
         address owner;
         address spender;
-        uint256 value;
+        uint256 value_hash;
         uint256 deadline;
         uint8 v;
         bytes32 r;
@@ -135,11 +145,10 @@ abstract contract FHERC20 is
 
     /**
      * @dev encTransferFrom `value` greater than `permit.permitValue`
-     * TODO: Replace uint256 `value` with uint256 `ct_hash`
      */
     error FHERC20EncTransferFromValueMismatch(
-        uint256 value,
-        uint256 permitValue
+        uint256 inValueHash,
+        uint256 permitValueHash
     );
 
     /**
@@ -235,28 +244,58 @@ abstract contract FHERC20 is
 
     /**
      * @dev See {IERC20-balanceOf}.
-     * TODO: Document
+     *
+     * Returns the euint128 representing the account's true balance (encrypted)
      */
     function encBalanceOf(
         address account
-    ) public view virtual returns (uint256) {
-        // TODO: Switch this to returning the euint128 encrypted amount
+    ) public view virtual returns (euint128) {
         return _encBalances[account];
     }
 
-    function sealBalanceSelf(bytes32 sealingKey) public virtual {
-        // TODO: Indicate that user `msg.sender` is sealing `_encBalances[msg.sender]` with `sealingKey`
-        // FHE.sealoutput(_encBalances[msg.sender], sealingKey);
+    /**
+     * @dev Requests an account's balance to be sealed. The result of the sealing
+     * operation will only be visible to parties in possession of the private key
+     * associated with the `sealingKey` passed as a parameter.
+     *
+     * NOTE: Be very careful when overriding this function not to expose encrypted data.
+     */
+    function sealBalanceOf(address account, bytes32 sealingKey) public virtual {
+        FHE.sealoutput(_encBalances[account], sealingKey);
+        _sealingRequests[msg.sender][_encBalances[account]] = SealingRequest({
+            account: account,
+            sealingKey: sealingKey
+        });
     }
 
     /**
-     * Can be returned without permit here because it was sealed with an unknown sealing key.
-     * The sealed result leaks no data without the sealingKey pair privateKey
+     * @dev Function called by CoFHE with the result of a sealoutput request
+     */
+    function handleSealOutputResult(
+        uint256 ctHash,
+        string memory result,
+        address requestor
+    ) external override {
+        SealingRequest memory request = _sealingRequests[requestor][ctHash];
+        _sealedResults[request.account][request.sealingKey] = result;
+    }
+
+    /**
+     * @dev Retrieves the sealed output result (if it is ready) that has been returned by the coprocessor.
+     *
+     * Requirements:
+     *
+     * - `account`
+     * - `sealingKey` must match the `sealingKey` passed into `sealBalanceOf`, or the result will not be found.
+     *
+     * Returns the sealed result as a `SealedUint` struct so that it can be automatically unsealed by `cofhe.js`.
      */
     function sealedBalanceOf(
-        address account
-    ) public view virtual returns (uint256) {
-        // return FHE.sealoutputResult(_sealedBalances[account]);
+        address account,
+        bytes32 sealingKey
+    ) public view virtual returns (SealedUint memory result) {
+        result.data = _sealedResults[account][sealingKey];
+        result.utype = Utils.EUINT128_TFHE;
     }
 
     /**
@@ -274,13 +313,13 @@ abstract contract FHERC20 is
      *
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `value`.
-     *
-     * TODO: Replace uint256 cleartext value with inEuint128 encrypted value
+     * - `inValue` must be a `inEuint128` to preserve confidentiality.
      */
     function encTransfer(
         address to,
-        uint256 value
+        inEuint128 memory inValue
     ) public virtual returns (bool) {
+        euint128 value = FHE.asEuint128(inValue);
         address owner = _msgSender();
         _transfer(owner, to, value);
         return true;
@@ -334,7 +373,7 @@ abstract contract FHERC20 is
     function encTransferFrom(
         address from,
         address to,
-        uint256 value,
+        inEuint128 memory inValue,
         FHERC20_EIP712_Permit calldata permit
     ) public virtual returns (bool) {
         if (block.timestamp > permit.deadline)
@@ -344,15 +383,19 @@ abstract contract FHERC20 is
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
         if (to != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
-        if (value != permit.value)
-            revert FHERC20EncTransferFromValueMismatch(value, permit.value);
+
+        if (inValue.hash != permit.value_hash)
+            revert FHERC20EncTransferFromValueMismatch(
+                inValue.hash,
+                permit.value_hash
+            );
 
         bytes32 structHash = keccak256(
             abi.encode(
                 PERMIT_TYPEHASH,
                 permit.owner,
                 permit.spender,
-                value,
+                permit.value_hash,
                 _useNonce(permit.owner),
                 permit.deadline
             )
@@ -364,6 +407,8 @@ abstract contract FHERC20 is
         if (signer != permit.owner) {
             revert ERC2612InvalidSigner(signer, permit.owner);
         }
+
+        euint128 value = FHE.asEuint128(inValue);
 
         _transfer(from, to, value);
         return true;
@@ -379,14 +424,14 @@ abstract contract FHERC20 is
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
-    function _transfer(address from, address to, uint256 value) internal {
+    function _transfer(address from, address to, euint128 value) internal {
         if (from == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        _update(from, to, value);
+        _update(from, to, value, 0);
     }
 
     /*
@@ -414,39 +459,42 @@ abstract contract FHERC20 is
      * (or `to`) is the zero address. All customizations to transfers, mints, and burns should be done by overriding
      * this function.
      *
+     * The `cleartextValue` input is used only for totalSupply, and is included when updated is called
+     * by the `_mint` and `_burn` functions, else it is 0.
+     *
      * Emits a {Transfer} event.
      */
-    function _update(address from, address to, uint256 value) internal virtual {
+    function _update(
+        address from,
+        address to,
+        euint128 value,
+        uint128 cleartextValue
+    ) internal virtual {
+        // If `value` is greater than the user's encBalance, it is replaced with 0
+        // The transaction will succeed, but the amount transferred may be 0
+        // Both `from` and `to` will have their `encBalance` updated in either case to preserve confidentiality
+        euint128 valueOr0 = FHE.select(
+            value.lte(_encBalances[from]),
+            value,
+            FHE.asEuint128(0)
+        );
+
         if (from == address(0)) {
-            // Overflow check required: The rest of the code assumes that totalSupply never overflows
-            _totalSupply += value;
+            _totalSupply += cleartextValue;
         } else {
-            uint256 fromBalance = _encBalances[from];
-            if (fromBalance < value) {
-                revert ERC20InsufficientBalance(from, fromBalance, value);
-            }
-            unchecked {
-                // Overflow not possible: value <= fromBalance <= totalSupply.
-                _encBalances[from] = fromBalance - value;
-                _indicatedBalances[from] = _decrementIndicator(
-                    _indicatedBalances[from]
-                );
-            }
+            _encBalances[from] = FHE.sub(_encBalances[from], valueOr0);
+            _indicatedBalances[from] = _decrementIndicator(
+                _indicatedBalances[from]
+            );
         }
 
         if (to == address(0)) {
-            unchecked {
-                // Overflow not possible: value <= totalSupply or value <= fromBalance <= totalSupply.
-                _totalSupply -= value;
-            }
+            _totalSupply -= cleartextValue;
         } else {
-            unchecked {
-                // Overflow not possible: balance + value is at most totalSupply, which we know fits into a uint256.
-                _encBalances[to] += value;
-                _indicatedBalances[to] = _incrementIndicator(
-                    _indicatedBalances[to]
-                );
-            }
+            _encBalances[from] = FHE.add(_encBalances[from], valueOr0);
+            _indicatedBalances[to] = _incrementIndicator(
+                _indicatedBalances[to]
+            );
         }
 
         emit Transfer(from, to, _indicatorTick);
@@ -460,11 +508,11 @@ abstract contract FHERC20 is
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
-    function _mint(address account, uint256 value) internal {
+    function _mint(address account, uint128 value) internal {
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        _update(address(0), account, value);
+        _update(address(0), account, FHE.asEuint128(value), value);
     }
 
     /**
@@ -475,11 +523,11 @@ abstract contract FHERC20 is
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead
      */
-    function _burn(address account, uint256 value) internal {
+    function _burn(address account, uint128 value) internal {
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        _update(account, address(0), value);
+        _update(account, address(0), FHE.asEuint128(value), value);
     }
 
     // EIP712 Permit
