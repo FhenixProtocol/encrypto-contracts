@@ -13,7 +13,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint128, inEuint128, SealedUint, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -36,14 +36,7 @@ import "@fhenixprotocol/cofhe-contracts/FHE.sol";
  * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
  * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
-abstract contract FHERC20 is
-    IFHERC20,
-    IFHERC20Errors,
-    Context,
-    EIP712,
-    Nonces,
-    IAsyncFHEReceiver
-{
+abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     // NOTE: `indicatedBalances` are intended to indicate movement and change
     // of an encrypted FHERC20 balance, without exposing any encrypted data.
     //
@@ -79,12 +72,10 @@ abstract contract FHERC20 is
     uint8 private _decimals;
     uint256 private _indicatorTick;
 
-    mapping(address account => mapping(uint256 ct_hash => SealingRequest request))
-        private _sealingRequests;
-    mapping(address account => mapping(bytes32 sealingKey => string sealedResult))
-        private _sealedResults;
-
-    uint256 SEALOUTPUT_PENDING = keccak256(bytes("SEALOUTPUT_PENDING"));
+    mapping(address account => bytes32 sealingKey) private _accountSealingKeys;
+    mapping(euint128 ctHash => mapping(bytes32 sealingKey => SealOutputRequest request))
+        private _sealOutputRequests;
+    mapping(euint128 ctHash => DecryptRequest request) private _decryptRequests;
 
     // EIP712 Permit
 
@@ -204,12 +195,16 @@ abstract contract FHERC20 is
      */
     function sealBalanceOf(address account, bytes32 sealingKey) public virtual {
         FHE.sealoutput(_encBalances[account], sealingKey);
-        _sealingRequests[msg.sender][
-            euint128.unwrap(_encBalances[account])
-        ] = SealingRequest({account: account, sealingKey: sealingKey});
-        _sealedResults[request.account][
-            request.sealingKey
-        ] = SEALOUTPUT_PENDING;
+
+        _accountSealingKeys[msg.sender] = sealingKey;
+
+        SealOutputRequest storage request = _sealOutputRequests[
+            _encBalances[account]
+        ][sealingKey];
+
+        request.account = account;
+        request.ctHash = _encBalances[account];
+        request.status = RequestStatus.Pending;
     }
 
     /**
@@ -220,13 +215,18 @@ abstract contract FHERC20 is
         string memory result,
         address requestor
     ) external override {
-        SealingRequest memory request = _sealingRequests[requestor][ctHash];
-        _sealedResults[request.account][request.sealingKey] = result;
-        emit FHERC20SealedResultReady(
+        SealOutputRequest storage request = _sealOutputRequests[
+            euint128.wrap(ctHash)
+        ][_accountSealingKeys[requestor]];
+
+        request.result = result;
+        request.status = RequestStatus.Ready;
+
+        emit FHERC20SealOutputResultReady(
             request.account,
-            request.sealingKey,
             ctHash,
-            result
+            result,
+            _accountSealingKeys[requestor]
         );
     }
 
@@ -238,20 +238,73 @@ abstract contract FHERC20 is
      * - `account`
      * - `sealingKey` must match the `sealingKey` passed into `sealBalanceOf`, or the result will not be found.
      *
+     * Returns the request associated with the account and sealing key.
      * Returns the sealed result as a `SealedUint` struct so that it can be automatically unsealed by `cofhe.js`.
      */
     function sealedBalanceOf(
         address account,
         bytes32 sealingKey
-    ) public view virtual returns (SealedUint memory result) {
-        string memory resultData = _sealedResults[account][sealingKey];
-
-        if (bytes(result).length == 0) revert FHERC20SealedResultNotRequested();
-        if (keccak256(bytes(resultData)) == SEALOUTPUT_PENDING)
-            revert FHERC20SealedResultPending();
-
-        result.data = resultData;
+    )
+        public
+        view
+        virtual
+        returns (SealOutputRequest memory request, SealedUint memory result)
+    {
+        request = _sealOutputRequests[_encBalances[account]][sealingKey];
+        result.data = request.result;
         result.utype = Utils.EUINT128_TFHE;
+    }
+
+    /**
+     * @dev Requests an account's balance to be decrypted.
+     * See Fhenix CoFHE AccessControlList (ACL) for information on which accounts and
+     * contracts are permitted to request a decryption.
+     *
+     * NOTE: Be very careful when overriding this function not to expose encrypted data.
+     */
+    function decryptBalanceOf(address account) public virtual {
+        FHE.decrypt(_encBalances[account]);
+
+        DecryptRequest storage request = _decryptRequests[
+            _encBalances[account]
+        ];
+
+        request.account = account;
+        request.ctHash = _encBalances[account];
+        request.status = RequestStatus.Pending;
+    }
+
+    /**
+     * @dev Function called by CoFHE with the result of a decrypt request
+     */
+    function handleDecryptResult(
+        uint256 ctHash,
+        uint256 result,
+        address
+    ) external override {
+        DecryptRequest storage request = _decryptRequests[
+            euint128.wrap(ctHash)
+        ];
+
+        request.result = result;
+        request.status = RequestStatus.Ready;
+
+        emit FHERC20DecryptResultReady(request.account, ctHash, result);
+    }
+
+    /**
+     * @dev Retrieves the decrypted result (if it is ready) that has been returned by the coprocessor.
+     */
+    function decryptedBalanceOf(
+        address account
+    )
+        public
+        view
+        virtual
+        returns (DecryptRequest memory request, uint256 result)
+    {
+        request = _decryptRequests[_encBalances[account]];
+        result = request.result;
     }
 
     /**
@@ -499,7 +552,9 @@ abstract contract FHERC20 is
      * Every successful call to {permit} increases ``owner``'s nonce by one. This
      * prevents a signature from being used multiple times.
      */
-    function nonces(address owner) public view override returns (uint256) {
+    function nonces(
+        address owner
+    ) public view override(IFHERC20, Nonces) returns (uint256) {
         return super.nonces(owner);
     }
 

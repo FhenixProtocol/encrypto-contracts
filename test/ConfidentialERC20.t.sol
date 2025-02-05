@@ -65,7 +65,7 @@ contract FHERC20Test is TestSetup {
         _expectFHERC20Transfer(eBTC, address(0), bob);
 
         vm.prank(bob);
-        eBTC.encrypt(bob, value);
+        eBTC.encrypt(bob, uint128(value));
 
         _expectERC20BalancesChange(wBTC, bob, -1 * int256(value));
         _expectFHERC20BalancesChange(
@@ -86,7 +86,7 @@ contract FHERC20Test is TestSetup {
         _expectFHERC20Transfer(eBTC, address(0), bob);
 
         vm.prank(bob);
-        eBTC.encrypt(bob, value);
+        eBTC.encrypt(bob, uint128(value));
 
         _expectERC20BalancesChange(wBTC, bob, -1 * int256(value));
         _expectFHERC20BalancesChange(
@@ -118,7 +118,7 @@ contract FHERC20Test is TestSetup {
         _expectERC20Transfer(wBTC, address(eBTC), bob, value);
 
         vm.prank(bob);
-        eBTC.decrypt(bob, value);
+        eBTC.decrypt(bob, uint128(value));
 
         _expectERC20BalancesChange(wBTC, bob, int256(value));
         _expectFHERC20BalancesChange(

@@ -10,16 +10,6 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
  */
 interface IFHERC20Errors is IERC20Errors {
     /**
-     * @dev SealOutput result has not been requested
-     */
-    error FHERC20SealedResultNotRequested();
-
-    /**
-     * @dev SealOutput result has not been returned by CoFHE
-     */
-    error FHERC20SealedResultPending();
-
-    /**
      * @dev Indicates an incompatible function being called.
      * Prevents unintentional treatment of an FHERC20 as a cleartext ERC20
      */

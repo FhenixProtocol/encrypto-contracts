@@ -57,12 +57,12 @@ contract ConfidentialERC20 is FHERC20, Ownable {
         return _erc20;
     }
 
-    function encrypt(address to, uint256 value) public {
+    function encrypt(address to, uint128 value) public {
         IERC20(_erc20).transferFrom(msg.sender, address(this), value);
         _mint(to, value);
     }
 
-    function decrypt(address to, uint256 value) public {
+    function decrypt(address to, uint128 value) public {
         _burn(msg.sender, value);
         IERC20(_erc20).transfer(to, value);
     }

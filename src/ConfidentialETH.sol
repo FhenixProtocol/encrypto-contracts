@@ -25,17 +25,17 @@ contract ConfidentialETH is FHERC20, Ownable {
 
     error ETHTransferFailed();
 
-    function encryptWETH(address to, uint256 value) public {
+    function encryptWETH(address to, uint128 value) public {
         wETH.transferFrom(msg.sender, address(this), value);
         wETH.withdraw(value);
         _mint(to, value);
     }
 
     function encryptETH(address to) public payable {
-        _mint(to, msg.value);
+        _mint(to, uint128(msg.value));
     }
 
-    function decrypt(address to, uint256 value) public {
+    function decrypt(address to, uint128 value) public {
         _burn(msg.sender, value);
 
         (bool sent, ) = to.call{value: value}("");

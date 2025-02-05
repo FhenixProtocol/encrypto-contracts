@@ -3,14 +3,14 @@
 
 pragma solidity ^0.8.25;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
-import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {FHE, euint128, inEuint128, SealedUint, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -36,12 +36,10 @@ import "@fhenixprotocol/cofhe-contracts/FHE.sol";
 abstract contract FHERC20Upgradeable is
     IFHERC20,
     IFHERC20Errors,
+    Initializable,
     ContextUpgradeable,
     EIP712Upgradeable,
-    NoncesUpgradeable,
-    IAsyncFHEReceiver,
-    Initializable,
-    ContextUpgradeable
+    NoncesUpgradeable
 {
     struct FHERC20Storage {
         // NOTE: `indicatedBalances` are intended to indicate movement and change
@@ -76,14 +74,17 @@ abstract contract FHERC20Upgradeable is
         string _symbol;
         uint8 _decimals;
         uint256 _indicatorTick;
-        mapping(address account => mapping(uint256 ct_hash => SealingRequest request)) _sealingRequests;
-        mapping(address account => mapping(bytes32 sealingKey => string sealedResult)) _sealedResults;
+        mapping(address account => bytes32 sealingKey) _accountSealingKeys;
+        mapping(euint128 euint128 => mapping(bytes32 sealingKey => SealOutputRequest request)) _sealOutputRequests;
+        mapping(euint128 euint128 => DecryptRequest request) _decryptRequests;
     }
 
+    // bytes32 private constant FHERC20StorageLocation =
+    //     keccak256(
+    //         abi.encode(uint256(keccak256("fhenix.storage.FHERC20")) - 1)
+    //     ) & ~bytes32(uint256(0xff));
     bytes32 private constant FHERC20StorageLocation =
-        keccak256(
-            abi.encode(uint256(keccak256("fhenix.storage.FHERC20")) - 1)
-        ) & ~bytes32(uint256(0xff));
+        0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00;
 
     function _getFHERC20Storage()
         private
@@ -95,14 +96,13 @@ abstract contract FHERC20Upgradeable is
         }
     }
 
-    uint256 SEALOUTPUT_PENDING = keccak256(bytes("SEALOUTPUT_PENDING"));
-
     // EIP712 Permit
 
-    bytes32 private constant PERMIT_TYPEHASH =
-        keccak256(
-            "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
-        );
+    // bytes32 private constant PERMIT_TYPEHASH =
+    //     keccak256(
+    //         "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
+    //     );
+    bytes32 private constant PERMIT_TYPEHASH = 0x0;
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -120,7 +120,7 @@ abstract contract FHERC20Upgradeable is
         $._symbol = symbol_;
         $._decimals = decimals_;
         $._indicatorTick = 10 ** (decimals_ - 4);
-        __EIP712_init_unchained(name, "1");
+        __EIP712_init_unchained(name_, "1");
     }
 
     function __FHERC20_init_unchained() internal onlyInitializing {}
@@ -156,7 +156,7 @@ abstract contract FHERC20Upgradeable is
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
     function decimals() public view virtual returns (uint8) {
-        ERC20Storage storage $ = _getFHERC20Storage();
+        FHERC20Storage storage $ = _getFHERC20Storage();
         return $._decimals;
     }
 
@@ -164,7 +164,7 @@ abstract contract FHERC20Upgradeable is
      * @dev See {IERC20-totalSupply}.
      */
     function totalSupply() public view virtual returns (uint256) {
-        ERC20Storage storage $ = _getFHERC20Storage();
+        FHERC20Storage storage $ = _getFHERC20Storage();
         return $._totalSupply;
     }
 
@@ -221,13 +221,15 @@ abstract contract FHERC20Upgradeable is
 
         FHE.sealoutput($._encBalances[account], sealingKey);
 
-        $._sealingRequests[msg.sender][
-            euint128.unwrap($._encBalances[account])
-        ] = SealingRequest({account: account, sealingKey: sealingKey});
+        $._accountSealingKeys[msg.sender] = sealingKey;
 
-        $._sealedResults[request.account][
-            request.sealingKey
-        ] = SEALOUTPUT_PENDING;
+        SealOutputRequest storage request = $._sealOutputRequests[
+            $._encBalances[account]
+        ][sealingKey];
+
+        request.account = account;
+        request.ctHash = $._encBalances[account];
+        request.status = RequestStatus.Pending;
     }
 
     /**
@@ -240,14 +242,18 @@ abstract contract FHERC20Upgradeable is
     ) external override {
         FHERC20Storage storage $ = _getFHERC20Storage();
 
-        SealingRequest memory request = $._sealingRequests[requestor][ctHash];
-        $._sealedResults[request.account][request.sealingKey] = result;
+        SealOutputRequest storage request = $._sealOutputRequests[
+            euint128.wrap(ctHash)
+        ][$._accountSealingKeys[requestor]];
 
-        emit FHERC20SealedResultReady(
+        request.result = result;
+        request.status = RequestStatus.Ready;
+
+        emit FHERC20SealOutputResultReady(
             request.account,
-            request.sealingKey,
             ctHash,
-            result
+            result,
+            $._accountSealingKeys[requestor]
         );
     }
 
@@ -264,17 +270,73 @@ abstract contract FHERC20Upgradeable is
     function sealedBalanceOf(
         address account,
         bytes32 sealingKey
-    ) public view virtual returns (SealedUint memory result) {
+    )
+        public
+        view
+        virtual
+        returns (SealOutputRequest memory request, SealedUint memory result)
+    {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        request = $._sealOutputRequests[$._encBalances[account]][sealingKey];
+        result.data = request.result;
+        result.utype = Utils.EUINT128_TFHE;
+    }
+
+    /**
+     * @dev Requests an account's balance to be decrypted.
+     * See Fhenix CoFHE AccessControlList (ACL) for information on which accounts and
+     * contracts are permitted to request a decryption.
+     *
+     * NOTE: Be very careful when overriding this function not to expose encrypted data.
+     */
+    function decryptBalanceOf(address account) public virtual {
         FHERC20Storage storage $ = _getFHERC20Storage();
 
-        string memory resultData = $._sealedResults[account][sealingKey];
+        FHE.decrypt($._encBalances[account]);
 
-        if (bytes(result).length == 0) revert FHERC20SealedResultNotRequested();
-        if (keccak256(bytes(resultData)) == SEALOUTPUT_PENDING)
-            revert FHERC20SealedResultPending();
+        DecryptRequest storage request = $._decryptRequests[
+            $._encBalances[account]
+        ];
 
-        result.data = resultData;
-        result.utype = Utils.EUINT128_TFHE;
+        request.account = account;
+        request.ctHash = $._encBalances[account];
+        request.status = RequestStatus.Pending;
+    }
+
+    /**
+     * @dev Function called by CoFHE with the result of a decrypt request
+     */
+    function handleDecryptResult(
+        uint256 ctHash,
+        uint256 result,
+        address
+    ) external override {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+
+        DecryptRequest storage request = $._decryptRequests[
+            euint128.wrap(ctHash)
+        ];
+
+        request.result = result;
+        request.status = RequestStatus.Ready;
+
+        emit FHERC20DecryptResultReady(request.account, ctHash, result);
+    }
+
+    /**
+     * @dev Retrieves the decrypted result (if it is ready) that has been returned by the coprocessor.
+     */
+    function decryptedBalanceOf(
+        address account
+    )
+        public
+        view
+        virtual
+        returns (DecryptRequest memory request, uint256 result)
+    {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        request = $._decryptRequests[$._encBalances[account]];
+        result = request.result;
     }
 
     /**
@@ -523,7 +585,9 @@ abstract contract FHERC20Upgradeable is
      * Every successful call to {permit} increases ``owner``'s nonce by one. This
      * prevents a signature from being used multiple times.
      */
-    function nonces(address owner) public view override returns (uint256) {
+    function nonces(
+        address owner
+    ) public view override(IFHERC20, NoncesUpgradeable) returns (uint256) {
         return super.nonces(owner);
     }
 

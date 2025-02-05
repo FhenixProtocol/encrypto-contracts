@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Test, console} from "forge-std/Test.sol";
 import {FHERC20, FHERC20_Harness} from "./FHERC20_Harness.sol";
 import {ERC20, ERC20_Harness} from "./ERC20_Harness.sol";
-import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
+import {ConfidentialERC20} from "../src/ConfidentialERC20NonFHE.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import {SigUtils} from "./SigUtils.sol";
