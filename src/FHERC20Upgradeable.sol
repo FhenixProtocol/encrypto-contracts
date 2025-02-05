@@ -38,7 +38,7 @@ abstract contract FHERC20Upgradeable is
     IFHERC20Errors,
     ContextUpgradeable,
     EIP712Upgradeable,
-    NoncesUpgradable,
+    NoncesUpgradeable,
     IAsyncFHEReceiver,
     Initializable,
     ContextUpgradeable

@@ -6,9 +6,9 @@
 
 Standards:
 
-- FHERC20.sol (The full FHERC20 without FHE included, for testing EIP712 / indicated balances. Documented in FHERC20.md)
-- FHERC20wFHE.sol (FHERC20.sol + FHE operations)
-- FHERC20wFHEUpgradeable.sol (FHERC20wFHE.sol + Upgradeability)
+- FHERC20NonFHE.sol (The full FHERC20 without FHE included, for testing EIP712 / indicated balances. Documented in FHERC20.md)
+- FHERC20.sol (FHERC20.sol + FHE operations)
+- FHERC20Upgradeable.sol (FHERC20wFHE.sol + Upgradeability)
 - interfaces/IFHERC20.sol
 - interfaces/IFHERC20Errors.sol
 
@@ -16,8 +16,9 @@ Encrypto:
 
 - EncryptoCore.sol (Routing tokens to their encrypted counterpart)
 - ConfidentialERC20.sol (FHERC20 wrapper around ERC20 with `encrypt` and `decrypt` functionality)
+- ConfidentialERC20NonFHE.sol (ConfidentialERC20.sol functionality without FHE for testing)
 - ConfidentialETH.sol (ConfidentialERC20.sol + native ETH -> eETH `encrypt`ing)
-- FUSD.sol (FHERC20.sol + `mint` and `burn` integration with Paxos)
+- FUSD.sol (FHERC20Upgradeable.sol + `mint` and `burn` integration with Paxos)
 
 ---
 

@@ -8,7 +8,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {FHERC20Upgradeable} from "./FHERC20Upgradeable.sol";
 
-contract FUSD is FHERC20Upgradable, Initializable, AccessControlUpgradeable {
+contract FUSD is FHERC20Upgradeable, Initializable, AccessControlUpgradeable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER");
     error CallerNotMinter(address caller);
 
