@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {FHERC20} from "../src/FHERC20.sol";
+import {FHERC20} from "../src/FHERC20NonFHE.sol";
 
 contract FHERC20_Harness is FHERC20 {
     constructor(

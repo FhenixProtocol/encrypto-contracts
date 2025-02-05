@@ -33,7 +33,7 @@ import "@fhenixprotocol/cofhe-contracts/FHE.sol";
  * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
  * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
-abstract contract FHERC20Upgradable is
+abstract contract FHERC20Upgradeable is
     IFHERC20,
     IFHERC20Errors,
     ContextUpgradeable,

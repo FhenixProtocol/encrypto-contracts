@@ -28,7 +28,7 @@ import {euint128, inEuint128, SealedUint} from "@fhenixprotocol/cofhe-contracts/
  * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
  * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
-interface IFHERC20 is IERC20, IERC5267, IERC20Metadata {
+interface IFHERC20 is IERC20, IERC20Metadata {
     /**
      * @dev Struct that holds the data related to a sealing request
      */
