@@ -4,6 +4,10 @@
 
 ### Contracts (/src)
 
+Audit scope:
+
+- All contracts other than `___NonFHE.sol`. The non-fhe enabled contracts are included purely as reference contracts.
+
 Standards:
 
 - FHERC20NonFHE.sol (The full FHERC20 without FHE included, for testing EIP712 / indicated balances. Documented in FHERC20.md)

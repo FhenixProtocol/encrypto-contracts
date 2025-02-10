@@ -498,7 +498,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (to == address(0)) {
             _totalSupply -= cleartextValue;
         } else {
-            _encBalances[from] = FHE.add(_encBalances[from], valueOr0);
+            _encBalances[to] = FHE.add(_encBalances[to], valueOr0);
             _indicatedBalances[to] = _incrementIndicator(
                 _indicatedBalances[to]
             );
