@@ -2,5 +2,7 @@
 
 pragma solidity ^0.8.24;
 
+import {TASK_MANAGER_ADDRESS} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+
 // todo (eshel) update with correct address
-address constant taskManagerAddress = 0x218A38A3f2A3EA3E8e092509C75e74BeB0adFB65;
+address constant taskManagerAddress = TASK_MANAGER_ADDRESS;

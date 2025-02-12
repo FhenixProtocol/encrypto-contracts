@@ -8,8 +8,9 @@ import {ConfidentialERC20} from "../src/ConfidentialERC20NonFHE.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import {SigUtils} from "./SigUtils.sol";
+import {FhenixMocks} from "./FhenixMocks.sol";
 
-abstract contract TestSetup is Test, IERC20Errors {
+abstract contract TestSetup is Test, FhenixMocks, IERC20Errors {
     // USERS
 
     address public deployer = 0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84;
@@ -70,6 +71,8 @@ abstract contract TestSetup is Test, IERC20Errors {
     // SETUP
 
     function setUp() public virtual {
+        etchFhenixMocks();
+
         initUsers();
 
         sigUtils = new SigUtils();
