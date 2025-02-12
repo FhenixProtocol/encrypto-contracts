@@ -32,7 +32,7 @@ contract FhenixMocks is Test {
     function xorUnseal(
         string memory sealedData,
         bytes32 publicKey
-    ) internal view returns (uint256 result) {
+    ) internal pure returns (uint256 result) {
         bytes32 mask = keccak256(abi.encodePacked(publicKey));
         bytes32 xored = hexStringToBytes32(sealedData) ^ mask;
         return uint256(xored);
@@ -69,7 +69,7 @@ contract FhenixMocks is Test {
         }
     }
 
-    function asEncrypted(
+    function FHE_asEncrypted(
         uint8 utype,
         uint256 value
     ) internal returns (uint256) {
@@ -89,8 +89,19 @@ contract FhenixMocks is Test {
             return euint256.unwrap(FHE.asEuint256(uint256(value)));
         } else if (utype == Utils.EADDRESS_TFHE) {
             return eaddress.unwrap(FHE.asEaddress(address(uint160(value))));
+        } else {
+            revert("Invalid utype");
         }
-        revert("Invalid utype");
+    }
+
+    function stripTrivialEncryptMask(
+        uint256 ctHash
+    ) internal returns (uint256 strippedCtHash) {
+        // Strip the trivial encrypt mask
+        strippedCtHash = taskManager.MOCK_stripTrivialEncryptMask(ctHash);
+
+        // Replace the hash with the stripped hash in storage
+        taskManager.MOCK_replaceHash(ctHash, strippedCtHash);
     }
 
     // Generic internal function to create encrypted input types
@@ -99,10 +110,12 @@ contract FhenixMocks is Test {
         uint256 value,
         int32 securityZone
     ) internal returns (bytes memory) {
+        uint256 ctHash = FHE_asEncrypted(utype, value);
+        uint256 strippedCtHash = stripTrivialEncryptMask(ctHash);
         return
             abi.encode(
                 securityZone,
-                asEncrypted(utype, value),
+                strippedCtHash,
                 utype,
                 "MOCK" // signature
             );

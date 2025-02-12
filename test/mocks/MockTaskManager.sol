@@ -261,20 +261,42 @@ contract MockTMStorage {
             keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 
-    // Fns
-
-    function getFromMockStorage(uint256 ctHash) public view returns (uint256) {
-        return mockStorage[ctHash];
+    function opIs(string memory op, FunctionId fid) public pure returns (bool) {
+        return strEq(op, Utils.functionIdToString(fid));
     }
 
-    function insertIntoMockStorage(uint256 ctHash, uint256 value) internal {
+    // Storage functions
+
+    function _set(uint256 ctHash, uint256 value) internal {
         mockStorage[ctHash] = value;
         inMockStorage[ctHash] = true;
     }
 
-    function insertIntoMockStorage(uint256 ctHash, bool value) internal {
-        insertIntoMockStorage(ctHash, value ? 1 : 0);
+    function _set(uint256 ctHash, bool value) internal {
+        _set(ctHash, value ? 1 : 0);
     }
+
+    function _get(uint256 ctHash) internal view returns (uint256) {
+        if (!inMockStorage[ctHash]) revert InputNotInMockStorage(ctHash);
+        return mockStorage[ctHash];
+    }
+
+    // Public functions
+
+    function MOCK_replaceHash(uint256 oldHash, uint256 newHash) public {
+        uint256 value = _get(oldHash);
+        inMockStorage[oldHash] = false;
+        mockStorage[oldHash] = 0;
+        _set(newHash, value);
+    }
+
+    function MOCK_stripTrivialEncryptMask(
+        uint256 ctHash
+    ) public pure returns (uint256) {
+        return ctHash & ~TMCommon.triviallyEncryptedMask;
+    }
+
+    // Mock functions
 
     function MOCK_verifyKeyInStorage(uint256 ctHash) internal view {
         if (!inMockStorage[ctHash]) revert InputNotInMockStorage(ctHash);
@@ -285,24 +307,21 @@ contract MockTMStorage {
         string memory operation,
         uint256 input
     ) internal {
-        if (strEq(operation, Utils.functionIdToString(FunctionId.random))) {
-            insertIntoMockStorage(ctHash, uint256(blockhash(block.number - 1)));
+        if (opIs(operation, FunctionId.random)) {
+            _set(ctHash, uint256(blockhash(block.number - 1)));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.cast))) {
-            insertIntoMockStorage(ctHash, mockStorage[input]);
+        if (opIs(operation, FunctionId.cast)) {
+            _set(ctHash, _get(input));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.not))) {
-            bool inputIsTruthy = mockStorage[input] == 1;
-            insertIntoMockStorage(ctHash, !inputIsTruthy);
+        if (opIs(operation, FunctionId.not)) {
+            bool inputIsTruthy = _get(input) == 1;
+            _set(ctHash, !inputIsTruthy);
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.square))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input] * mockStorage[input]
-            );
+        if (opIs(operation, FunctionId.square)) {
+            _set(ctHash, _get(input) * _get(input));
             return;
         }
         revert InvalidUnaryOperation(operation);
@@ -314,148 +333,90 @@ contract MockTMStorage {
         uint256 input1,
         uint256 input2
     ) internal {
-        if (strEq(operation, Utils.functionIdToString(FunctionId.sub))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] - mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.sub)) {
+            _set(ctHash, _get(input1) - _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.add))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] + mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.add)) {
+            _set(ctHash, _get(input1) + _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.xor))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] ^ mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.xor)) {
+            _set(ctHash, _get(input1) ^ _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.and))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] & mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.and)) {
+            _set(ctHash, _get(input1) & _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.or))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] | mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.or)) {
+            _set(ctHash, _get(input1) | _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.div))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] / mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.div)) {
+            _set(ctHash, _get(input1) / _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.rem))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] % mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.rem)) {
+            _set(ctHash, _get(input1) % _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.mul))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] * mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.mul)) {
+            _set(ctHash, _get(input1) * _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.shl))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] << mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.shl)) {
+            _set(ctHash, _get(input1) << _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.shr))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] >> mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.shr)) {
+            _set(ctHash, _get(input1) >> _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.gte))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] >= mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.gte)) {
+            _set(ctHash, _get(input1) >= _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.lte))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] <= mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.lte)) {
+            _set(ctHash, _get(input1) <= _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.lt))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] < mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.lt)) {
+            _set(ctHash, _get(input1) < _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.gt))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] > mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.gt)) {
+            _set(ctHash, _get(input1) > _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.min))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] < mockStorage[input2]
-                    ? mockStorage[input1]
-                    : mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.min)) {
+            uint256 min = _get(input1) < _get(input2)
+                ? _get(input1)
+                : _get(input2);
+            _set(ctHash, min);
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.max))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] > mockStorage[input2]
-                    ? mockStorage[input1]
-                    : mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.max)) {
+            uint256 max = _get(input1) > _get(input2)
+                ? _get(input1)
+                : _get(input2);
+            _set(ctHash, max);
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.eq))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] == mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.eq)) {
+            _set(ctHash, _get(input1) == _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.ne))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] != mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.ne)) {
+            _set(ctHash, _get(input1) != _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.rol))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] << mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.rol)) {
+            _set(ctHash, _get(input1) << _get(input2));
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.ror))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] >> mockStorage[input2]
-            );
+        if (opIs(operation, FunctionId.ror)) {
+            _set(ctHash, _get(input1) >> _get(input2));
             return;
         }
         revert InvalidTwoInputOperation(operation);
@@ -468,22 +429,12 @@ contract MockTMStorage {
         uint256 input2,
         uint256 input3
     ) internal {
-        if (
-            strEq(
-                operation,
-                Utils.functionIdToString(FunctionId.trivialEncrypt)
-            )
-        ) {
-            insertIntoMockStorage(ctHash, input1);
+        if (opIs(operation, FunctionId.trivialEncrypt)) {
+            _set(ctHash, input1);
             return;
         }
-        if (strEq(operation, Utils.functionIdToString(FunctionId.select))) {
-            insertIntoMockStorage(
-                ctHash,
-                mockStorage[input1] == 1
-                    ? mockStorage[input2]
-                    : mockStorage[input3]
-            );
+        if (opIs(operation, FunctionId.select)) {
+            _set(ctHash, _get(input1) == 1 ? _get(input2) : _get(input3));
             return;
         }
         revert InvalidThreeInputOperation(operation);
@@ -496,7 +447,7 @@ contract MockTMStorage {
     ) internal {
         IAsyncFHEReceiver(sender).handleDecryptResult(
             ctHash,
-            mockStorage[ctHash],
+            _get(ctHash),
             requestor
         );
     }
@@ -507,7 +458,7 @@ contract MockTMStorage {
         bytes32 publicKey
     ) internal view returns (string memory) {
         bytes32 mask = keccak256(abi.encodePacked(publicKey));
-        bytes32 xored = bytes32(mockStorage[ctHash]) ^ mask;
+        bytes32 xored = bytes32(_get(ctHash)) ^ mask;
         return bytes32ToHexString(xored);
     }
 
