@@ -318,9 +318,13 @@ contract TaskManager is MockCoFHE, ITaskManager {
     ) private {
         if (inputs.length == 1) {
             emit TaskCreated(ctHash, operation, inputs[0], 0, 0);
+
+            // NOTE: MOCK
             MOCK_unaryOperation(ctHash, operation, inputs[0]);
         } else if (inputs.length == 2) {
             emit TaskCreated(ctHash, operation, inputs[0], inputs[1], 0);
+
+            // NOTE: MOCK
             MOCK_twoInputOperation(ctHash, operation, inputs[0], inputs[1]);
         } else {
             emit TaskCreated(
@@ -330,6 +334,8 @@ contract TaskManager is MockCoFHE, ITaskManager {
                 inputs[1],
                 inputs[2]
             );
+
+            // NOTE: MOCK
             MOCK_threeInputOperation(
                 ctHash,
                 operation,
@@ -343,6 +349,8 @@ contract TaskManager is MockCoFHE, ITaskManager {
     function createDecryptTask(uint256 ctHash, address requestor) public {
         checkAllowed(ctHash);
         emit DecryptRequest(ctHash, msg.sender, requestor);
+
+        // NOTE: MOCK
         MOCK_decryptOperation(ctHash, requestor, msg.sender);
     }
 
@@ -353,6 +361,8 @@ contract TaskManager is MockCoFHE, ITaskManager {
     ) public {
         checkAllowed(ctHash);
         emit SealOutputRequest(ctHash, publicKey, msg.sender, requestor);
+
+        // NOTE: MOCK
         MOCK_sealoutputOperation(ctHash, publicKey, requestor, msg.sender);
     }
 
@@ -588,6 +598,8 @@ contract TaskManager is MockCoFHE, ITaskManager {
         }
 
         acl.allowTransient(ctHash, msg.sender);
+
+        // NOTE: MOCK
         MOCK_verifyKeyInStorage(ctHash);
     }
 
