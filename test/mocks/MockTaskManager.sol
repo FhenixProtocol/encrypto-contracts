@@ -239,7 +239,7 @@ library TMCommon {
     }
 }
 
-contract TaskManager is ITaskManager {
+contract TaskManager is ITaskManager, MockStorage {
     // Errors
     // Returned when the handle is not allowed in the ACL for the account.
     error ACLNotAllowed(uint256 handle, address account);
@@ -317,10 +317,19 @@ contract TaskManager is ITaskManager {
     ) private {
         if (inputs.length == 1) {
             emit TaskCreated(ctHash, operation, inputs[0], 0, 0);
+            MOCK_unaryOperation(ctHash, operation, inputs[0]);
         } else if (inputs.length == 2) {
             emit TaskCreated(ctHash, operation, inputs[0], inputs[1], 0);
+            MOCK_twoInputOperation(ctHash, operation, inputs[0], inputs[1]);
         } else {
             emit TaskCreated(
+                ctHash,
+                operation,
+                inputs[0],
+                inputs[1],
+                inputs[2]
+            );
+            MOCK_threeInputOperation(
                 ctHash,
                 operation,
                 inputs[0],
@@ -333,6 +342,7 @@ contract TaskManager is ITaskManager {
     function createDecryptTask(uint256 ctHash, address requestor) public {
         checkAllowed(ctHash);
         emit DecryptRequest(ctHash, msg.sender, requestor);
+        MOCK_decryptOperation(ctHash, requestor, msg.sender);
     }
 
     function createSealOutputTask(
@@ -342,6 +352,7 @@ contract TaskManager is ITaskManager {
     ) public {
         checkAllowed(ctHash);
         emit SealOutputRequest(ctHash, publicKey, msg.sender, requestor);
+        MOCK_sealoutputOperation(ctHash, publicKey, requestor, msg.sender);
     }
 
     function checkAllowed(uint256 ctHash) internal view {
@@ -576,6 +587,7 @@ contract TaskManager is ITaskManager {
         }
 
         acl.allowTransient(ctHash, msg.sender);
+        MOCK_verifyKeyInStorage(ctHash);
     }
 
     function allow(uint256 ctHash, address account) external {
@@ -668,5 +680,256 @@ contract TaskManager is ITaskManager {
         uint256 handle
     ) public view returns (bool) {
         return acl.isAllowedWithPermission(permission, handle);
+    }
+}
+
+contract MockStorage {
+    // Used internally to check if we missed any operations in the mocks
+    error InvalidUnaryOperation(string operation);
+    error InvalidTwoInputOperation(string operation);
+    error InvalidThreeInputOperation(string operation);
+
+    mapping(uint256 => uint256) public mockStorage;
+    mapping(uint256 => bool) public inMockStorage;
+
+    function insertIntoMockStorage(uint256 ctHash, uint256 value) internal {
+        mockStorage[ctHash] = value;
+        inMockStorage[ctHash] = true;
+    }
+
+    function MOCK_verifyKeyInStorage(uint256 ctHash) internal view {
+        return inMockStorage[ctHash];
+    }
+
+    function MOCK_unaryOperation(
+        uint256 ctHash,
+        string memory operation,
+        uint256 input
+    ) internal {
+        if (operation == Utils.functionIdToString(FunctionId.random)) {
+            insertIntoMockStorage(ctHash, uint256(blockhash(block.number - 1)));
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.trivialEncrypt)) {
+            insertIntoMockStorage(ctHash, input);
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.cast)) {
+            insertIntoMockStorage(ctHash, mockStorage[input]);
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.not)) {
+            bool inputIsTruthy = mockStorage[input] == 1;
+            insertIntoMockStorage(ctHash, inputIsTruthy ? 0 : 1);
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.square)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input] * mockStorage[input]
+            );
+            return;
+        }
+        revert InvalidUnaryOperation(operation);
+    }
+
+    function MOCK_twoInputOperation(
+        uint256 ctHash,
+        string memory operation,
+        uint256 input1,
+        uint256 input2
+    ) internal {
+        if (operation == Utils.functionIdToString(FunctionId.sub)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] - mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.add)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] + mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.xor)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] ^ mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.and)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] & mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.or)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] | mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.div)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] / mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.rem)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] % mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.mul)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] * mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.shl)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] << mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.shr)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] >> mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.gte)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] >= mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.lte)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] <= mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.lt)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] < mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.gt)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] > mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.min)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] < mockStorage[input2]
+                    ? mockStorage[input1]
+                    : mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.max)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] > mockStorage[input2]
+                    ? mockStorage[input1]
+                    : mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.eq)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] == mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.ne)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] != mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.rol)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] << mockStorage[input2]
+            );
+            return;
+        }
+        if (operation == Utils.functionIdToString(FunctionId.ror)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] >> mockStorage[input2]
+            );
+            return;
+        }
+        revert InvalidTwoInputOperation(operation);
+    }
+
+    function MOCK_threeInputOperation(
+        uint256 ctHash,
+        string memory operation,
+        uint256 input1,
+        uint256 input2,
+        uint256 input3
+    ) internal {
+        if (operation == Utils.functionIdToString(FunctionId.select)) {
+            insertIntoMockStorage(
+                ctHash,
+                mockStorage[input1] == 1
+                    ? mockStorage[input2]
+                    : mockStorage[input3]
+            );
+            return;
+        }
+        revert InvalidThreeInputOperation(operation);
+    }
+
+    function MOCK_decryptOperation(
+        uint256 ctHash,
+        address requestor,
+        address sender
+    ) internal {
+        IAsyncFHEReceiver(sender).handleDecryptResult(
+            ctHash,
+            mockStorage[ctHash],
+            requestor
+        );
+    }
+
+    function MOCK_sealoutputOperation(
+        uint256 ctHash,
+        bytes32 publicKey,
+        address requestor,
+        address sender
+    ) internal {
+        string memory sealedOutput = string(
+            abi.encodePacked(publicKey, mockStorage[ctHash])
+        );
+        IAsyncFHEReceiver(sender).handleSealOutputResult(
+            ctHash,
+            sealedOutput,
+            requestor
+        );
     }
 }
