@@ -8,7 +8,7 @@ import {ConfidentialERC20} from "../src/ConfidentialERC20NonFHE.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import {SigUtils} from "./SigUtils.sol";
-import {FhenixMocks} from "./FhenixMocks.sol";
+import {FhenixMocks} from "./mocks/FhenixMocks.sol";
 
 abstract contract TestSetup is Test, FhenixMocks, IERC20Errors {
     // USERS

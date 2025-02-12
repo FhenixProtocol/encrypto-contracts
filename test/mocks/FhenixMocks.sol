@@ -2,13 +2,12 @@
 pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
-import {TaskManager} from "./mocks/MockTaskManager.sol";
+import {TaskManager} from "./MockTaskManager.sol";
+import {ACL} from "./ACL.sol";
 import "@fhenixprotocol/cofhe-contracts/FHE.sol";
-import {ACL} from "./mocks/ACL.sol";
 
 contract FhenixMocks is Test {
     // MOCKS
-    TaskManager public tmpTaskManager;
     TaskManager public taskManager;
     ACL public acl;
 
@@ -29,6 +28,8 @@ contract FhenixMocks is Test {
         taskManager.setACLContract(address(acl));
     }
 
+    // Unseal a sealed value returned by FHE.sealoutput
+    // In the mocked task manager, the sealed value is an xored value of the original value and a mask derived from the public key
     function xorUnseal(
         string memory sealedData,
         bytes32 publicKey
@@ -69,6 +70,8 @@ contract FhenixMocks is Test {
         }
     }
 
+    // Generic function to create an encrypted value of a given type
+    // The hash returned is a pointer to the value in the mocked task manager
     function FHE_asEncrypted(
         uint8 utype,
         uint256 value

@@ -256,12 +256,15 @@ contract MockTMStorage {
     function strEq(
         string memory _a,
         string memory _b
-    ) public pure returns (bool) {
+    ) internal pure returns (bool) {
         return
             keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 
-    function opIs(string memory op, FunctionId fid) public pure returns (bool) {
+    function opIs(
+        string memory op,
+        FunctionId fid
+    ) internal pure returns (bool) {
         return strEq(op, Utils.functionIdToString(fid));
     }
 
@@ -464,7 +467,7 @@ contract MockTMStorage {
 
     function bytes32ToHexString(
         bytes32 data
-    ) public pure returns (string memory) {
+    ) internal pure returns (string memory) {
         bytes memory hexChars = "0123456789abcdef";
         bytes memory str = new bytes(66);
         str[0] = "0";

@@ -2,10 +2,10 @@
 pragma solidity ^0.8.13;
 
 import {console} from "forge-std/Test.sol";
-import {TestSetup} from "./TestSetup.sol";
+import {FhenixMocks} from "./FhenixMocks.sol";
 import "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
-contract DecryptContract is IAsyncFHEReceiver {
+contract SimpleDecrypter is IAsyncFHEReceiver {
     mapping(uint256 ctHash => uint256) public decryptedRes;
     mapping(uint256 ctHash => string) public sealedRes;
 
@@ -43,14 +43,15 @@ contract DecryptContract is IAsyncFHEReceiver {
     }
 }
 
-contract MockTaskManagerTests is TestSetup {
-    DecryptContract decryptContract;
-    DecryptContract decryptThief;
+contract MockTaskManagerTests is FhenixMocks {
+    SimpleDecrypter simpleDecrypter;
+    SimpleDecrypter thiefDecrypter;
 
-    function setUp() public override {
-        super.setUp();
-        decryptContract = new DecryptContract();
-        decryptThief = new DecryptContract();
+    function setUp() public {
+        etchFhenixMocks();
+
+        simpleDecrypter = new SimpleDecrypter();
+        thiefDecrypter = new SimpleDecrypter();
     }
 
     function _testTrivialEncrypt(uint8 utype, uint256 value) internal {
@@ -373,10 +374,10 @@ contract MockTaskManagerTests is TestSetup {
         inEuint8 memory inEuint8Value = createInEuint8(uint8Value);
 
         vm.prank(address(userAddress));
-        decryptContract.decrypt(inEuint8Value);
+        simpleDecrypter.decrypt(inEuint8Value);
 
         // In mocks, this happens synchronously
-        uint256 result = decryptContract.decryptedRes(inEuint8Value.hash);
+        uint256 result = simpleDecrypter.decryptedRes(inEuint8Value.hash);
 
         assertEq(result, uint8Value);
     }
@@ -390,10 +391,10 @@ contract MockTaskManagerTests is TestSetup {
 
         vm.prank(address(userAddress));
         bytes32 publicKey = bytes32("HELLO0x1234567890abcdef");
-        decryptContract.sealoutput(inEuint8Value, publicKey);
+        simpleDecrypter.sealoutput(inEuint8Value, publicKey);
 
         // In mocks, this happens synchronously
-        string memory result = decryptContract.sealedRes(inEuint8Value.hash);
+        string memory result = simpleDecrypter.sealedRes(inEuint8Value.hash);
 
         uint256 unsealed = xorUnseal(result, publicKey);
         assertEq(unsealed, uint8Value);
@@ -415,21 +416,21 @@ contract MockTaskManagerTests is TestSetup {
             abi.encodeWithSelector(
                 ACLNotAllowed.selector,
                 inEuint8Value.hash,
-                address(decryptThief)
+                address(thiefDecrypter)
             )
         );
 
-        decryptThief.decrypt(euint8Value);
+        thiefDecrypter.decrypt(euint8Value);
 
         // Allow decrypt
 
         vm.prank(address(userAddress));
-        FHE.allow(euint8Value, address(decryptThief));
+        FHE.allow(euint8Value, address(thiefDecrypter));
 
         // Decrypt succeeds
 
-        decryptThief.decrypt(euint8Value);
+        thiefDecrypter.decrypt(euint8Value);
 
-        assertEq(decryptThief.decryptedRes(inEuint8Value.hash), uint8Value);
+        assertEq(thiefDecrypter.decryptedRes(inEuint8Value.hash), uint8Value);
     }
 }
