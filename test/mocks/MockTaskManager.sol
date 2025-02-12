@@ -501,15 +501,39 @@ contract MockTMStorage {
         );
     }
 
+    // Keccak256-based XOR shift.
+    function MOCK_xorSeal(
+        uint256 ctHash,
+        bytes32 publicKey
+    ) internal view returns (string memory) {
+        bytes32 mask = keccak256(abi.encodePacked(publicKey));
+        bytes32 xored = bytes32(mockStorage[ctHash]) ^ mask;
+        return bytes32ToHexString(xored);
+    }
+
+    function bytes32ToHexString(
+        bytes32 data
+    ) public pure returns (string memory) {
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory str = new bytes(66);
+        str[0] = "0";
+        str[1] = "x";
+
+        for (uint256 i = 0; i < 32; i++) {
+            str[2 + i * 2] = hexChars[uint8(data[i]) >> 4];
+            str[3 + i * 2] = hexChars[uint8(data[i]) & 0x0f];
+        }
+
+        return string(str);
+    }
+
     function MOCK_sealoutputOperation(
         uint256 ctHash,
         bytes32 publicKey,
         address requestor,
         address sender
     ) internal {
-        string memory sealedOutput = string(
-            abi.encodePacked(publicKey, mockStorage[ctHash])
-        );
+        string memory sealedOutput = MOCK_xorSeal(ctHash, publicKey);
         IAsyncFHEReceiver(sender).handleSealOutputResult(
             ctHash,
             sealedOutput,
