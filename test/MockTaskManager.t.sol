@@ -278,4 +278,211 @@ contract MockTaskManagerTests is TestSetup {
         uint256 unsealed = xorUnseal(result, publicKey);
         assertEq(unsealed, uint8Value);
     }
+
+    function test_mock_euint32_operations() public {
+        uint32 a = 100;
+        uint32 b = 50;
+
+        // Convert to encrypted values
+        euint32 ea = FHE.asEuint32(a);
+        euint32 eb = FHE.asEuint32(b);
+
+        // Test unary operations
+        {
+            // Test not (only works on ebool)
+            ebool eboolVal = FHE.asEbool(true);
+            ebool notResult = FHE.not(eboolVal);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(notResult)),
+                0
+            );
+        }
+        {
+            // Test square
+            euint32 squared = FHE.square(ea);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(squared)),
+                a * a
+            );
+        }
+
+        // Test two-input operations
+        {
+            // Arithmetic operations
+            euint32 sum = FHE.add(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(sum)),
+                a + b
+            );
+        }
+        {
+            // Test subtraction
+            euint32 diff = FHE.sub(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(diff)),
+                a - b
+            );
+        }
+        {
+            // Test multiplication
+            euint32 prod = FHE.mul(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(prod)),
+                a * b
+            );
+        }
+        {
+            // Test division
+            euint32 div = FHE.div(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(div)),
+                a / b
+            );
+        }
+        {
+            // Test remainder
+            euint32 rem = FHE.rem(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(rem)),
+                a % b
+            );
+        }
+
+        // Bitwise operations
+        {
+            // Test bitwise AND
+            euint32 andResult = FHE.and(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(andResult)),
+                a & b
+            );
+        }
+        {
+            // Test bitwise OR
+            euint32 orResult = FHE.or(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(orResult)),
+                a | b
+            );
+        }
+        {
+            // Test bitwise XOR
+            euint32 xorResult = FHE.xor(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(xorResult)),
+                a ^ b
+            );
+        }
+
+        // Shift operations
+        uint32 shift = 2;
+        {
+            // Test shift left
+            euint32 es = FHE.asEuint32(shift);
+
+            euint32 shl = FHE.shl(ea, es);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(shl)),
+                a << shift
+            );
+        }
+        {
+            // Test shift right
+            euint32 es = FHE.asEuint32(shift);
+
+            euint32 shr = FHE.shr(ea, es);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(shr)),
+                a >> shift
+            );
+        }
+        {
+            // Test rol
+            euint32 es = FHE.asEuint32(shift);
+
+            euint32 rol = FHE.rol(ea, es);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(rol)),
+                a << shift // Note: rol is implemented as shl in the mock
+            );
+        }
+        {
+            // Test ror
+            euint32 es = FHE.asEuint32(shift);
+
+            euint32 ror = FHE.ror(ea, es);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(ror)),
+                a >> shift // Note: ror is implemented as shr in the mock
+            );
+        }
+
+        // Comparison operations
+        {
+            // Test greater than
+            ebool gt = FHE.gt(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(gt)),
+                a > b ? 1 : 0
+            );
+        }
+        {
+            // Test less than
+            ebool lt = FHE.lt(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(lt)),
+                a < b ? 1 : 0
+            );
+        }
+        {
+            // Test greater than or equal to
+            ebool gte = FHE.gte(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(gte)),
+                a >= b ? 1 : 0
+            );
+        }
+        {
+            // Test less than or equal to
+            ebool lte = FHE.lte(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(lte)),
+                a <= b ? 1 : 0
+            );
+        }
+        {
+            // Test equal to
+            ebool eq = FHE.eq(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(eq)),
+                a == b ? 1 : 0
+            );
+        }
+        {
+            // Test not equal to
+            ebool ne = FHE.ne(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(ebool.unwrap(ne)),
+                a != b ? 1 : 0
+            );
+        }
+
+        // Min/Max operations
+        {
+            // Test min
+            euint32 min = FHE.min(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(min)),
+                a < b ? a : b
+            );
+        }
+        {
+            // Test max
+            euint32 max = FHE.max(ea, eb);
+            assertEq(
+                taskManager.getFromMockStorage(euint32.unwrap(max)),
+                a > b ? a : b
+            );
+        }
+    }
 }
