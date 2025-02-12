@@ -9,12 +9,7 @@ solc = '0.8.25'
 optimizer = true
 optimizer-runs = 200
 fs_permissions = [{ access = "read-write", path = "./data" }]
-remappings = [
-  "forge-std/=lib/forge-std/src/",
-  "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
-  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-  "@fhenixprotocol/cofhe-contracts/=lib/cofhe-contracts/contracts/"
-]
+auto_detect_remappings = false
 
 [profile.ci.fuzz]
 runs = 10_000
