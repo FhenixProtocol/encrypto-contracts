@@ -7,7 +7,7 @@
 This is a foundry project using gitmodules, install with:
 
 ```bash
-git clone --recurse-submodules
+git clone --recurse-submodules git@github.com:FhenixProtocol/encrypto-contracts.git
 ```
 
 ### Contracts (/src)
