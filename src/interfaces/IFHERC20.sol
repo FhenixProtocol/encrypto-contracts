@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {euint128, inEuint128, SealedUint} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {euint128, inEuint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -143,7 +143,7 @@ interface IFHERC20 is IERC20, IERC20Metadata {
     function encTransfer(
         address to,
         inEuint128 memory inValue
-    ) external returns (bool);
+    ) external returns (euint128 transferred);
 
     /**
      * @dev See {IERC20-allowance}.
@@ -186,7 +186,7 @@ interface IFHERC20 is IERC20, IERC20Metadata {
         address to,
         inEuint128 memory inValue,
         FHERC20_EIP712_Permit calldata permit
-    ) external returns (bool);
+    ) external returns (euint128 transferred);
 
     // EIP712 Permit
 

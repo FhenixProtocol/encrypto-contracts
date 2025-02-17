@@ -13,7 +13,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -208,11 +208,10 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     function encTransfer(
         address to,
         inEuint128 memory inValue
-    ) public virtual returns (bool) {
+    ) public virtual returns (euint128 transferred) {
         euint128 value = FHE.asEuint128(inValue);
         address owner = _msgSender();
-        _transfer(owner, to, value);
-        return true;
+        transferred = _transfer(owner, to, value);
     }
 
     /**
@@ -262,7 +261,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         address to,
         inEuint128 memory inValue,
         FHERC20_EIP712_Permit calldata permit
-    ) public virtual returns (bool) {
+    ) public virtual returns (euint128 transferred) {
         if (block.timestamp > permit.deadline)
             revert ERC2612ExpiredSignature(permit.deadline);
 
@@ -297,8 +296,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
         euint128 value = FHE.asEuint128(inValue);
 
-        _transfer(from, to, value);
-        return true;
+        transferred = _transfer(from, to, value);
     }
 
     /**
@@ -311,14 +309,18 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
-    function _transfer(address from, address to, euint128 value) internal {
+    function _transfer(
+        address from,
+        address to,
+        euint128 value
+    ) internal returns (euint128 transferred) {
         if (from == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        _update(from, to, value, 0);
+        transferred = _update(from, to, value, 0);
     }
 
     /*
@@ -356,7 +358,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         address to,
         euint128 value,
         uint128 cleartextValue
-    ) internal virtual {
+    ) internal virtual returns (euint128 transferred) {
         // If `value` is greater than the user's encBalance, it is replaced with 0
         // The transaction will succeed, but the amount transferred may be 0
         // Both `from` and `to` will have their `encBalance` updated in either case to preserve confidentiality
@@ -364,17 +366,19 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         // NOTE: If the function is `_mint`, `from` is the zero address, and does not have an `encBalance` to
         //       compare against, so this check is skipped.
         if (from != address(0)) {
-            value = FHE.select(
+            transferred = FHE.select(
                 value.lte(_encBalances[from]),
                 value,
                 FHE.asEuint128(0)
             );
+        } else {
+            transferred = value;
         }
 
         if (from == address(0)) {
             _totalSupply += cleartextValue;
         } else {
-            _encBalances[from] = FHE.sub(_encBalances[from], value);
+            _encBalances[from] = FHE.sub(_encBalances[from], transferred);
             _indicatedBalances[from] = _decrementIndicator(
                 _indicatedBalances[from]
             );
@@ -383,7 +387,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (to == address(0)) {
             _totalSupply -= cleartextValue;
         } else {
-            _encBalances[to] = FHE.add(_encBalances[to], value);
+            _encBalances[to] = FHE.add(_encBalances[to], transferred);
             _indicatedBalances[to] = _incrementIndicator(
                 _indicatedBalances[to]
             );
@@ -393,16 +397,19 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (euint128.unwrap(_encBalances[from]) != 0) {
             FHE.allowThis(_encBalances[from]);
             FHE.allow(_encBalances[from], from);
-            FHE.allow(value, from);
+            FHE.allow(transferred, from);
         }
         if (euint128.unwrap(_encBalances[to]) != 0) {
             FHE.allowThis(_encBalances[to]);
             FHE.allow(_encBalances[to], to);
-            FHE.allow(value, to);
+            FHE.allow(transferred, to);
         }
 
+        // Allow the caller to decrypt the transferred amount
+        FHE.allow(transferred, msg.sender);
+
         emit Transfer(from, to, _indicatorTick);
-        emit EncTransfer(from, to, euint128.unwrap(value));
+        emit EncTransfer(from, to, euint128.unwrap(transferred));
     }
 
     /**
@@ -413,11 +420,19 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead.
      */
-    function _mint(address account, uint128 value) internal {
+    function _mint(
+        address account,
+        uint128 value
+    ) internal returns (euint128 transferred) {
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        _update(address(0), account, FHE.asEuint128(value), value);
+        transferred = _update(
+            address(0),
+            account,
+            FHE.asEuint128(value),
+            value
+        );
     }
 
     /**
@@ -428,11 +443,19 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
      *
      * NOTE: This function is not virtual, {_update} should be overridden instead
      */
-    function _burn(address account, uint128 value) internal {
+    function _burn(
+        address account,
+        uint128 value
+    ) internal returns (euint128 transferred) {
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        _update(account, address(0), FHE.asEuint128(value), value);
+        transferred = _update(
+            account,
+            address(0),
+            FHE.asEuint128(value),
+            value
+        );
     }
 
     // EIP712 Permit
