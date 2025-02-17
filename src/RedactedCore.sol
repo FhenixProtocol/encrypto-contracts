@@ -9,17 +9,22 @@ import {ConfidentialERC20} from "./ConfidentialERC20.sol";
 import {ConfidentialETH} from "./ConfidentialETH.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 
-contract EncryptoCore is Ownable {
+contract RedactedCore is Ownable {
     mapping(address erc20 => address fherc20) private _fherc20Map;
 
-    // Confidential ETH :: ETH / wETH deposited into Encrypto are routed to cETH
+    // Confidential ETH :: ETH / wETH deposited into Redacted are routed to cETH
     IWETH public wETH;
     ConfidentialETH public cETH;
 
     // Stablecoins :: deposited stablecoins are routed to FUSD
     mapping(address erc20 => bool isStablecoin) public _stablecoins;
 
-    constructor() Ownable(msg.sender) {}
+    constructor(IWETH wETH_, ConfidentialETH cETH_) Ownable(msg.sender) {
+        wETH = wETH_;
+        cETH = cETH_;
+    }
+
+    event Fherc20Deployed(address erc20, address fherc20);
 
     error Invalid_AlreadyDeployed();
     error Invalid_Stablecoin();
@@ -52,7 +57,7 @@ contract EncryptoCore is Ownable {
     }
 
     function deployFherc20(IERC20 erc20) public {
-        if (_fherc20Map[address(erc20)] == address(0))
+        if (_fherc20Map[address(erc20)] != address(0))
             revert Invalid_AlreadyDeployed();
 
         if (_stablecoins[address(erc20)]) revert Invalid_Stablecoin();
@@ -60,5 +65,7 @@ contract EncryptoCore is Ownable {
 
         ConfidentialERC20 fherc20 = new ConfidentialERC20(erc20, "");
         _fherc20Map[address(erc20)] = address(fherc20);
+
+        emit Fherc20Deployed(address(erc20), address(fherc20));
     }
 }

@@ -3,12 +3,14 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 import {FHERC20, FHERC20_Harness} from "./FHERC20_Harness.sol";
+import {IFHERC20} from "../src/interfaces/IFHERC20.sol";
 import {ERC20, ERC20_Harness} from "./ERC20_Harness.sol";
-import {ConfidentialERC20} from "../src/ConfidentialERC20NonFHE.sol";
+import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
-import {SigUtils} from "./SigUtils.sol";
+import {FHERC20SigUtils} from "./FHERC20SigUtils.sol";
 import {CoFheTest} from "@fhenixprotocol/cofhe-foundry-mocks/CoFheTest.sol";
+import {euint128} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 abstract contract TestSetup is Test, IERC20Errors {
     CoFheTest public CFT;
@@ -26,7 +28,7 @@ abstract contract TestSetup is Test, IERC20Errors {
     address payable public eve = payable(address(103));
     address payable[4] public users;
 
-    SigUtils internal sigUtils;
+    FHERC20SigUtils internal sigUtils;
 
     function initUsers() public {
         (address bobTemp, uint256 bobPKTemp) = makeAddrAndKey("bob");
@@ -53,9 +55,6 @@ abstract contract TestSetup is Test, IERC20Errors {
         vm.label(address(sigUtils), "sigUtils");
 
         vm.label(address(XXX), "XXX");
-
-        vm.label(address(wBTC), "wBTC");
-        vm.label(address(eBTC), "eBTC");
     }
 
     // FHERC20 TESTS
@@ -65,10 +64,6 @@ abstract contract TestSetup is Test, IERC20Errors {
     string public xxxSymbol = "eXXX";
     uint8 public xxxDecimals = 18;
 
-    // ConfidentialERC20 TESTS
-    ERC20_Harness public wBTC;
-    ConfidentialERC20 eBTC;
-
     // SETUP
 
     function setUp() public virtual {
@@ -76,12 +71,9 @@ abstract contract TestSetup is Test, IERC20Errors {
 
         initUsers();
 
-        sigUtils = new SigUtils();
+        sigUtils = new FHERC20SigUtils();
 
         XXX = new FHERC20_Harness(xxxName, xxxSymbol, xxxDecimals);
-
-        wBTC = new ERC20_Harness("Wrapped BTC", "wBTC", 8);
-        eBTC = new ConfidentialERC20(wBTC, "eBTC");
 
         label();
     }
@@ -184,20 +176,21 @@ abstract contract TestSetup is Test, IERC20Errors {
     }
 
     mapping(address user => uint256 balance) public indicatedBalances;
-    mapping(address user => uint256 balance) public trueBalances;
+    mapping(address user => uint256 balance) public encBalances;
 
     function _prepExpectFHERC20BalancesChange(
         FHERC20 token,
         address account
     ) public {
         indicatedBalances[account] = token.balanceOf(account);
-        trueBalances[account] = token.encBalanceOf(account);
+        euint128 encBalance = token.encBalanceOf(account);
+        encBalances[account] = CFT.mockStorage(euint128.unwrap(encBalance));
     }
     function _expectFHERC20BalancesChange(
         FHERC20 token,
         address account,
         int256 expectedIndicatedChange,
-        int256 expectedTrueChange
+        int256 expectedEncChange
     ) public view {
         uint256 currIndicated = token.balanceOf(account);
         int256 indicatedChange = int256(currIndicated) -
@@ -215,18 +208,20 @@ abstract contract TestSetup is Test, IERC20Errors {
             )
         );
 
-        uint256 currTrue = token.encBalanceOf(account);
-        int256 trueChange = int256(currTrue) - int256(trueBalances[account]);
+        euint128 encBalance = token.encBalanceOf(account);
+        uint256 currEncBalance = CFT.mockStorage(euint128.unwrap(encBalance));
+        int256 encChange = int256(currEncBalance) -
+            int256(encBalances[account]);
 
         assertEq(
-            expectedTrueChange,
-            trueChange,
+            expectedEncChange,
+            encChange,
             string.concat(
                 token.symbol(),
-                " expected TRUE balance change incorrect. Expected: ",
-                Strings.toStringSigned(expectedTrueChange),
+                " expected ENC balance change incorrect. Expected: ",
+                Strings.toStringSigned(expectedEncChange),
                 ", received: ",
-                Strings.toStringSigned(trueChange)
+                Strings.toStringSigned(encChange)
             )
         );
     }
@@ -245,17 +240,17 @@ abstract contract TestSetup is Test, IERC20Errors {
         int256 expectedChange
     ) public view {
         uint256 currTrue = token.balanceOf(account);
-        int256 trueChange = int256(currTrue) - int256(erc20Balances[account]);
+        int256 encChange = int256(currTrue) - int256(erc20Balances[account]);
 
         assertEq(
             expectedChange,
-            trueChange,
+            encChange,
             string.concat(
                 token.symbol(),
                 " expected ERC20 balance change incorrect. Expected: ",
                 Strings.toStringSigned(expectedChange),
                 ", received: ",
-                Strings.toStringSigned(trueChange)
+                Strings.toStringSigned(encChange)
             )
         );
     }
@@ -265,14 +260,14 @@ abstract contract TestSetup is Test, IERC20Errors {
         uint256 privateKey,
         address owner,
         address spender,
-        uint256 value,
+        uint256 value_hash,
         uint256 nonce,
         uint256 deadline
-    ) public view returns (FHERC20.FHERC20_EIP712_Permit memory permit) {
-        SigUtils.Permit memory sigUtilsPermit = SigUtils.Permit({
+    ) public view returns (IFHERC20.FHERC20_EIP712_Permit memory permit) {
+        FHERC20SigUtils.Permit memory sigUtilsPermit = FHERC20SigUtils.Permit({
             owner: owner,
             spender: spender,
-            value: value,
+            value_hash: value_hash,
             nonce: nonce,
             deadline: block.timestamp + deadline
         });
@@ -284,10 +279,10 @@ abstract contract TestSetup is Test, IERC20Errors {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
 
-        permit = FHERC20.FHERC20_EIP712_Permit({
+        permit = IFHERC20.FHERC20_EIP712_Permit({
             owner: owner,
             spender: spender,
-            value: value,
+            value_hash: value_hash,
             deadline: block.timestamp + deadline,
             v: v,
             r: r,
@@ -300,14 +295,14 @@ abstract contract TestSetup is Test, IERC20Errors {
         uint256 privateKey,
         address owner,
         address spender,
-        uint256 value
-    ) public view returns (FHERC20.FHERC20_EIP712_Permit memory permit) {
+        uint256 value_hash
+    ) public view returns (IFHERC20.FHERC20_EIP712_Permit memory permit) {
         permit = generateTransferFromPermit(
             token,
             privateKey,
             owner,
             spender,
-            value,
+            value_hash,
             token.nonces(owner),
             1 days
         );

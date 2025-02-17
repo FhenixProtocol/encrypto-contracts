@@ -16,7 +16,7 @@ contract ConfidentialETH is FHERC20, Ownable {
         Ownable(msg.sender)
         FHERC20(
             "Confidential Wrapped ETHER",
-            "cETH",
+            "eETH",
             IERC20Metadata(address(wETH_)).decimals()
         )
     {

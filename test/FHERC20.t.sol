@@ -4,7 +4,9 @@ pragma solidity ^0.8.13;
 import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {TestSetup} from "./TestSetup.sol";
-
+import {IFHERC20} from "../src/interfaces/IFHERC20.sol";
+import {IFHERC20Errors} from "../src/interfaces/IFHERC20Errors.sol";
+import {inEuint128} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 contract FHERC20Test is TestSetup {
     function setUp() public override {
         super.setUp();
@@ -26,6 +28,7 @@ contract FHERC20Test is TestSetup {
             10 ** (xxxDecimals - 4),
             "FHERC20 indicatorTick correct"
         );
+        assertEq(XXX.isFherc20(), true, "FHERC20 isFherc20 is true");
     }
 
     function test_Mint() public {
@@ -33,7 +36,7 @@ contract FHERC20Test is TestSetup {
 
         // 1st TX, indicated + 5001, true + 1e18
 
-        uint256 value = 1e18;
+        uint128 value = 1e18;
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
 
@@ -44,7 +47,7 @@ contract FHERC20Test is TestSetup {
             XXX,
             bob,
             _ticksToIndicated(XXX, 5001),
-            int256(value)
+            int128(value)
         );
 
         assertEq(XXX.totalSupply(), value, "Total supply increases");
@@ -60,7 +63,7 @@ contract FHERC20Test is TestSetup {
             XXX,
             bob,
             _ticksToIndicated(XXX, 1),
-            int256(value)
+            int128(value)
         );
 
         // Revert
@@ -102,31 +105,32 @@ contract FHERC20Test is TestSetup {
 
         // Transfer
 
-        vm.expectRevert(FHERC20.FHERC20IncompatibleFunction.selector);
+        vm.expectRevert(IFHERC20Errors.FHERC20IncompatibleFunction.selector);
         vm.prank(bob);
         XXX.transfer(alice, 1e18);
 
         // TransferFrom
 
-        vm.expectRevert(FHERC20.FHERC20IncompatibleFunction.selector);
+        vm.expectRevert(IFHERC20Errors.FHERC20IncompatibleFunction.selector);
         vm.prank(bob);
         XXX.transferFrom(alice, bob, 1e18);
 
         // Approve
 
-        vm.expectRevert(FHERC20.FHERC20IncompatibleFunction.selector);
+        vm.expectRevert(IFHERC20Errors.FHERC20IncompatibleFunction.selector);
         vm.prank(bob);
         XXX.approve(alice, 1e18);
 
         // Allowance
 
-        vm.expectRevert(FHERC20.FHERC20IncompatibleFunction.selector);
+        vm.expectRevert(IFHERC20Errors.FHERC20IncompatibleFunction.selector);
         XXX.allowance(bob, alice);
     }
 
     function test_EncTransfer() public {
         XXX.mint(bob, 10e18);
         XXX.mint(alice, 10e18);
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // Reversion - Transfer to 0 address
 
@@ -134,7 +138,7 @@ contract FHERC20Test is TestSetup {
             abi.encodeWithSelector(ERC20InvalidReceiver.selector, address(0))
         );
         vm.prank(bob);
-        XXX.encTransfer(address(0), 1e18);
+        XXX.encTransfer(address(0), inValue);
 
         // Success
 
@@ -143,7 +147,7 @@ contract FHERC20Test is TestSetup {
 
         _expectFHERC20Transfer(XXX, bob, alice);
         vm.prank(bob);
-        XXX.encTransfer(alice, 1e18);
+        XXX.encTransfer(alice, inValue);
 
         _expectFHERC20BalancesChange(
             XXX,
@@ -162,27 +166,41 @@ contract FHERC20Test is TestSetup {
     function test_EncTransferFrom() public {
         XXX.mint(bob, 10e18);
         XXX.mint(alice, 10e18);
-        FHERC20.FHERC20_EIP712_Permit memory permit;
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
 
         // Reversion - Transfer from 0 address
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, address(0), 1e18);
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            address(0),
+            inValue.hash
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(ERC20InvalidReceiver.selector, address(0))
         );
         vm.prank(bob);
-        XXX.encTransferFrom(bob, address(0), 1e18, permit);
+        XXX.encTransferFrom(bob, address(0), inValue, permit);
 
         // Success - Bob -> Alice (called by Bob, nonce = 0)
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
         _prepExpectFHERC20BalancesChange(XXX, alice);
 
         _expectFHERC20Transfer(XXX, bob, alice);
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         _expectFHERC20BalancesChange(
             XXX,
@@ -199,13 +217,20 @@ contract FHERC20Test is TestSetup {
 
         // Success - Bob -> Alice (called by Bob, nonce = 1)
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
         _prepExpectFHERC20BalancesChange(XXX, alice);
 
         _expectFHERC20Transfer(XXX, bob, alice);
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         _expectFHERC20BalancesChange(
             XXX,
@@ -222,13 +247,20 @@ contract FHERC20Test is TestSetup {
 
         // Success - Alice -> Bob (called by Bob)
 
-        permit = generateTransferFromPermit(XXX, alicePK, alice, bob, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            alicePK,
+            alice,
+            bob,
+            inValue.hash
+        );
 
         _prepExpectFHERC20BalancesChange(XXX, alice);
         _prepExpectFHERC20BalancesChange(XXX, bob);
 
         _expectFHERC20Transfer(XXX, alice, bob);
-        XXX.encTransferFrom(alice, bob, 1e18, permit);
+        XXX.encTransferFrom(alice, bob, inValue, permit);
 
         _expectFHERC20BalancesChange(
             XXX,
@@ -247,12 +279,20 @@ contract FHERC20Test is TestSetup {
     function test_EncTransferFrom_PermitReversions() public {
         XXX.mint(bob, 10e18);
         XXX.mint(alice, 10e18);
-        FHERC20.FHERC20_EIP712_Permit memory permit;
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // Valid
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         // Deadline passed - ERC2612ExpiredSignature
 
@@ -261,78 +301,114 @@ contract FHERC20Test is TestSetup {
             bobPK,
             bob,
             alice,
-            1e18,
+            inValue.hash,
             XXX.nonces(bob),
             0
         );
         vm.warp(block.timestamp + 1);
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.ERC2612ExpiredSignature.selector,
+                IFHERC20Errors.ERC2612ExpiredSignature.selector,
                 permit.deadline
             )
         );
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         // FHERC20EncTransferFromOwnerMismatch bob -> eve
 
-        permit = generateTransferFromPermit(XXX, bobPK, eve, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            eve,
+            alice,
+            inValue.hash
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.FHERC20EncTransferFromOwnerMismatch.selector,
+                IFHERC20Errors.FHERC20EncTransferFromOwnerMismatch.selector,
                 bob,
                 eve
             )
         );
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         // FHERC20EncTransferFromOwnerMismatch eve -> bob
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.FHERC20EncTransferFromOwnerMismatch.selector,
+                IFHERC20Errors.FHERC20EncTransferFromOwnerMismatch.selector,
                 eve,
                 bob
             )
         );
-        XXX.encTransferFrom(eve, alice, 1e18, permit);
+        XXX.encTransferFrom(eve, alice, inValue, permit);
 
         // FHERC20EncTransferFromSpenderMismatch
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.FHERC20EncTransferFromSpenderMismatch.selector,
+                IFHERC20Errors.FHERC20EncTransferFromSpenderMismatch.selector,
                 eve,
                 alice
             )
         );
-        XXX.encTransferFrom(bob, eve, 1e18, permit);
+        XXX.encTransferFrom(bob, eve, inValue, permit);
 
-        // FHERC20EncTransferFromValueMismatch
+        // FHERC20EncTransferFromValueHashMismatch
 
-        permit = generateTransferFromPermit(XXX, bobPK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(2e18, 0);
+        inEuint128 memory inValueMismatch = CFT.createInEuint128(2.1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.FHERC20EncTransferFromValueMismatch.selector,
-                2e18,
-                1e18
+                IFHERC20Errors.FHERC20EncTransferFromValueHashMismatch.selector,
+                inValueMismatch.hash,
+                inValue.hash
             )
         );
-        XXX.encTransferFrom(bob, alice, 2e18, permit);
+        XXX.encTransferFrom(bob, alice, inValueMismatch, permit);
 
         // Signer != owner - ERC2612InvalidSigner
 
-        permit = generateTransferFromPermit(XXX, alicePK, bob, alice, 1e18);
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            alicePK,
+            bob,
+            alice,
+            inValue.hash
+        );
         vm.expectRevert(
             abi.encodeWithSelector(
-                FHERC20.ERC2612InvalidSigner.selector,
+                IFHERC20Errors.ERC2612InvalidSigner.selector,
                 alice,
                 bob
             )
         );
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
 
         // Invalid nonce - ERC2612InvalidSigner
 
@@ -341,11 +417,11 @@ contract FHERC20Test is TestSetup {
             bobPK,
             bob,
             alice,
-            1e18,
+            inValue.hash,
             XXX.nonces(bob) - 1,
             1 days
         );
-        vm.expectPartialRevert(FHERC20.ERC2612InvalidSigner.selector);
-        XXX.encTransferFrom(bob, alice, 1e18, permit);
+        vm.expectPartialRevert(IFHERC20Errors.ERC2612InvalidSigner.selector);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
     }
 }

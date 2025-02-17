@@ -3,7 +3,7 @@
 
 pragma solidity ^0.8.25;
 
-import {FHERC20} from "../src/FHERC20NonFHE.sol";
+import {FHERC20} from "../src/FHERC20.sol";
 
 contract FHERC20_Harness is FHERC20 {
     constructor(
@@ -12,11 +12,11 @@ contract FHERC20_Harness is FHERC20 {
         uint8 decimals_
     ) FHERC20(name_, symbol_, decimals_) {}
 
-    function mint(address account, uint256 value) public {
+    function mint(address account, uint128 value) public {
         _mint(account, value);
     }
 
-    function burn(address account, uint256 value) public {
+    function burn(address account, uint128 value) public {
         _burn(account, value);
     }
 }

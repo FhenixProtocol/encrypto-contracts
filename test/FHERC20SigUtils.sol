@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-contract SigUtils {
+contract FHERC20SigUtils {
     constructor() {}
 
     bytes32 public constant PERMIT_TYPEHASH =
         keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+            "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
         );
 
     struct Permit {
         address owner;
         address spender;
-        uint256 value;
+        uint256 value_hash;
         uint256 nonce;
         uint256 deadline;
     }
@@ -27,7 +27,7 @@ contract SigUtils {
                     PERMIT_TYPEHASH,
                     _permit.owner,
                     _permit.spender,
-                    _permit.value,
+                    _permit.value_hash,
                     _permit.nonce,
                     _permit.deadline
                 )

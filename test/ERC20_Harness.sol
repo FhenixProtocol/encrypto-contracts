@@ -4,6 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IWETH} from "../src/interfaces/IWETH.sol";
 
 contract ERC20_Harness is ERC20 {
     uint8 _decimals;
@@ -26,5 +27,18 @@ contract ERC20_Harness is ERC20 {
 
     function burn(address account, uint256 value) public {
         _burn(account, value);
+    }
+}
+
+contract WETH_Harness is ERC20_Harness, IWETH {
+    constructor() ERC20_Harness("Wrapped ETH", "wETH", 18) {}
+
+    function withdraw(uint256 amount) public {
+        _burn(msg.sender, amount);
+        payable(msg.sender).transfer(amount);
+    }
+
+    function deposit() public payable {
+        _mint(msg.sender, msg.value);
     }
 }

@@ -4,12 +4,21 @@ pragma solidity ^0.8.13;
 import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {ERC20_Harness} from "./ERC20_Harness.sol";
-import {ConfidentialERC20} from "../src/ConfidentialERC20NonFHE.sol";
+import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
 import {TestSetup} from "./TestSetup.sol";
 
-contract FHERC20Test is TestSetup {
+contract ConfidentialERC20Test is TestSetup {
+    ERC20_Harness public wBTC;
+    ConfidentialERC20 eBTC;
+
     function setUp() public override {
         super.setUp();
+
+        wBTC = new ERC20_Harness("Wrapped BTC", "wBTC", 8);
+        vm.label(address(wBTC), "wBTC");
+
+        eBTC = new ConfidentialERC20(wBTC, "eBTC");
+        vm.label(address(eBTC), "eBTC");
     }
 
     // TESTS
@@ -27,6 +36,20 @@ contract FHERC20Test is TestSetup {
             address(wBTC),
             "ConfidentialERC20 underlying ERC20 correct"
         );
+    }
+
+    function test_FHERC20InvalidErc20() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ConfidentialERC20.FHERC20InvalidErc20.selector,
+                address(eBTC)
+            )
+        );
+        new ConfidentialERC20(eBTC, "eBTC");
+    }
+
+    function test_isFherc20() public {
+        assertEq(eBTC.isFherc20(), true, "eBTC is FHERC20");
     }
 
     function test_Symbol() public {

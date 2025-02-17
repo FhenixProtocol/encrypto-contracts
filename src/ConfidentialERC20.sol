@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {FHERC20} from "./FHERC20.sol";
+import {IFHERC20, FHERC20} from "./FHERC20.sol";
 
 contract ConfidentialERC20 is FHERC20, Ownable {
     IERC20 private immutable _erc20;
@@ -32,9 +32,14 @@ contract ConfidentialERC20 is FHERC20, Ownable {
             IERC20Metadata(address(erc20_)).decimals()
         )
     {
-        if (erc20_ == this) {
-            revert FHERC20InvalidErc20(address(this));
+        try IFHERC20(address(erc20_)).isFherc20() returns (bool isFherc20) {
+            if (isFherc20) {
+                revert FHERC20InvalidErc20(address(erc20_));
+            }
+        } catch {
+            // Not an FHERC20, continue
         }
+
         _erc20 = erc20_;
 
         _symbol = bytes(symbolOverride_).length == 0

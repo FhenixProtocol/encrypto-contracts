@@ -7,7 +7,7 @@ import {BaseERC20} from "./BaseERC20.sol";
 import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
 import {ChainJsonUtils} from "./ChainJsonUtils.sol";
 
-contract Encrypto is Script, ChainJsonUtils {
+contract Redacted is Script, ChainJsonUtils {
     modifier broadcast() {
         // `--account` is set in script call
         vm.startBroadcast();

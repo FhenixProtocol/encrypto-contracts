@@ -1,26 +1,20 @@
-# <h1 align="center"> Encrypto Contracts </h1>
+# <h1 align="center"> Redacted Contracts </h1>
 
-**FHERC20 standard + Encrypto Contracts (FHED / EncryptableWrappedFHERC20)**
+**FHERC20 standard + Redacted Contracts (FHED / EncryptableWrappedFHERC20)**
 
 ### Contracts (/src)
 
-Audit scope:
-
-- All contracts other than `___NonFHE.sol`. The non-fhe enabled contracts are included purely as reference contracts.
-
 Standards:
 
-- FHERC20NonFHE.sol (The full FHERC20 without FHE included, for testing EIP712 / indicated balances. Documented in FHERC20.md)
 - FHERC20.sol (FHERC20.sol + FHE operations)
 - FHERC20Upgradeable.sol (FHERC20wFHE.sol + Upgradeability)
 - interfaces/IFHERC20.sol
 - interfaces/IFHERC20Errors.sol
 
-Encrypto:
+Redacted:
 
-- EncryptoCore.sol (Routing tokens to their encrypted counterpart)
+- RedactedCore.sol (Routing tokens to their encrypted counterpart)
 - ConfidentialERC20.sol (FHERC20 wrapper around ERC20 with `encrypt` and `decrypt` functionality)
-- ConfidentialERC20NonFHE.sol (ConfidentialERC20.sol functionality without FHE for testing)
 - ConfidentialETH.sol (ConfidentialERC20.sol + native ETH -> eETH `encrypt`ing)
 - FUSD.sol (FHERC20Upgradeable.sol + `mint` and `burn` integration with Paxos)
 

@@ -1,5 +1,5 @@
 {
-	"name": "encrypto-contracts",
+	"name": "redacted-contracts",
 	"version": "0.0.1",
 	"scripts": {
 		"====== ENV ======": "",
@@ -10,7 +10,7 @@
 		"====== MISC ======": "",
 		"forge:coverage": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage",
 		"====== SCRIPT ======": "",
-		"script:run": "forge script script/Encrypto.s.sol:Encrypto --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvv",
+		"script:run": "forge script script/Redacted.s.sol:Redacted --rpc-url $RPC_URL --private-key $PRIVATE_KEY -vvv",
 		"script:sepolia": "pnpm env:sepolia pnpm script:run",
 		"script:sepolia:broadcast": "pnpm script:sepolia --broadcast",
 		"====== DEPLOY ======": "",

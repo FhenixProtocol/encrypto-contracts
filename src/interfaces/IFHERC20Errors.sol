@@ -36,11 +36,11 @@ interface IFHERC20Errors is IERC20Errors {
     );
 
     /**
-     * @dev encTransferFrom `value` greater than `permit.permitValue`
+     * @dev encTransferFrom `value` greater than `permit.value_hash` dont match (permit doesn't match inEuint128)
      * @param inValueHash encTransferFrom param inValue.hash.
      * @param permitValueHash token amount hash included in FHERC20_EIP712_Permit struct.
      */
-    error FHERC20EncTransferFromValueMismatch(
+    error FHERC20EncTransferFromValueHashMismatch(
         uint256 inValueHash,
         uint256 permitValueHash
     );
