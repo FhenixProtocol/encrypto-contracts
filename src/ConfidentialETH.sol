@@ -8,7 +8,7 @@ import {FHERC20} from "./FHERC20.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 
 contract ConfidentialETH is FHERC20, Ownable {
-    IWETH public immutable wETH;
+    IWETH public wETH;
 
     constructor(
         IWETH wETH_
@@ -22,6 +22,10 @@ contract ConfidentialETH is FHERC20, Ownable {
     {
         wETH = wETH_;
     }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 
     error ETHTransferFailed();
 

@@ -12,16 +12,16 @@ import {IWETH} from "./interfaces/IWETH.sol";
 contract RedactedCore is Ownable {
     mapping(address erc20 => address fherc20) private _fherc20Map;
 
-    // Confidential ETH :: ETH / wETH deposited into Redacted are routed to cETH
+    // Confidential ETH :: ETH / wETH deposited into Redacted are routed to eETH
     IWETH public wETH;
-    ConfidentialETH public cETH;
+    ConfidentialETH public eETH;
 
     // Stablecoins :: deposited stablecoins are routed to FUSD
     mapping(address erc20 => bool isStablecoin) public _stablecoins;
 
-    constructor(IWETH wETH_, ConfidentialETH cETH_) Ownable(msg.sender) {
+    constructor(IWETH wETH_, ConfidentialETH eETH_) Ownable(msg.sender) {
         wETH = wETH_;
-        cETH = cETH_;
+        eETH = eETH_;
     }
 
     event Fherc20Deployed(address erc20, address fherc20);

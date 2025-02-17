@@ -387,16 +387,21 @@ abstract contract FHERC20Upgradeable is
         // If `value` is greater than the user's encBalance, it is replaced with 0
         // The transaction will succeed, but the amount transferred may be 0
         // Both `from` and `to` will have their `encBalance` updated in either case to preserve confidentiality
-        euint128 valueOr0 = FHE.select(
-            value.lte($._encBalances[from]),
-            value,
-            FHE.asEuint128(0)
-        );
+        //
+        // NOTE: If the function is `_mint`, `from` is the zero address, and does not have an `encBalance` to
+        //       compare against, so this check is skipped.
+        if (from != address(0)) {
+            value = FHE.select(
+                value.lte($._encBalances[from]),
+                value,
+                FHE.asEuint128(0)
+            );
+        }
 
         if (from == address(0)) {
             $._totalSupply += cleartextValue;
         } else {
-            $._encBalances[from] = FHE.sub($._encBalances[from], valueOr0);
+            $._encBalances[from] = FHE.sub($._encBalances[from], value);
             $._indicatedBalances[from] = _decrementIndicator(
                 $._indicatedBalances[from]
             );
@@ -405,19 +410,26 @@ abstract contract FHERC20Upgradeable is
         if (to == address(0)) {
             $._totalSupply -= cleartextValue;
         } else {
-            $._encBalances[from] = FHE.add($._encBalances[from], valueOr0);
+            $._encBalances[from] = FHE.add($._encBalances[from], value);
             $._indicatedBalances[to] = _incrementIndicator(
                 $._indicatedBalances[to]
             );
         }
 
         // Update CoFHE Access Control List (ACL) to allow decrypting / sealing of the new balances
-        FHE.allowThis($._encBalances[from]);
-        FHE.allowThis($._encBalances[to]);
-        FHE.allow($._encBalances[from], from);
-        FHE.allow($._encBalances[to], to);
+        if (euint128.unwrap($._encBalances[from]) != 0) {
+            FHE.allowThis($._encBalances[from]);
+            FHE.allow($._encBalances[from], from);
+            FHE.allow(value, from);
+        }
+        if (euint128.unwrap($._encBalances[to]) != 0) {
+            FHE.allowThis($._encBalances[to]);
+            FHE.allow($._encBalances[to], to);
+            FHE.allow(value, to);
+        }
 
         emit Transfer(from, to, $._indicatorTick);
+        emit EncTransfer(from, to, euint128.unwrap(value));
     }
 
     /**
