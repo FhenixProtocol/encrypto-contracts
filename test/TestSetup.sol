@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {Test} from "forge-std/Test.sol";
 import {FHERC20, FHERC20_Harness} from "./FHERC20_Harness.sol";
 import {IFHERC20} from "../src/interfaces/IFHERC20.sol";
 import {ERC20, ERC20_Harness} from "./ERC20_Harness.sol";
@@ -66,7 +67,7 @@ abstract contract TestSetup is Test, IERC20Errors {
     // SETUP
 
     function setUp() public virtual {
-        CFT = new CoFheTest();
+        CFT = new CoFheTest(false);
 
         initUsers();
 

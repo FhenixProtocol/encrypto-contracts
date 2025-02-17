@@ -2,6 +2,14 @@
 
 **FHERC20 standard + Redacted Contracts (FHED / EncryptableWrappedFHERC20)**
 
+### Installation
+
+This is a foundry project using gitmodules, install with:
+
+```bash
+git clone --recurse-submodules
+```
+
 ### Contracts (/src)
 
 Standards:
