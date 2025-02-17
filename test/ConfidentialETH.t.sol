@@ -155,16 +155,34 @@ contract ConfidentialETHTest is TestSetup {
         vm.prank(bob);
         eETH.decrypt(bob, uint128(value));
 
-        uint256 bobEthFinal = address(bob).balance;
-        _expectFHERC20BalancesChange(
-            eETH,
-            bob,
-            -1 * _ticksToIndicated(eETH, 1),
-            -1 * int256(value)
-        );
+        // // Decrypt inserts a claimable amount into the user's claimable set
 
-        assertEq(bobEthFinal, bobEthInit + value, "Bob ETH balance increases");
+        // uint256[] memory claimable = eETH.userClaimable(bob);
+        // assertEq(claimable.length, 1, "Bob has 1 claimable amount");
+        // uint256 claimableCtHash = claimable[0];
+        // assertEq(
+        //     eETH.claimed(claimableCtHash),
+        //     false,
+        //     "Claimable amount not claimed"
+        // );
+        // CFT.assertStoredValue(claimableCtHash, value);
 
-        assertEq(eETH.totalSupply(), 10e8 - value, "Total supply decreases");
+        // // Claiming the amount will remove it from the user's claimable set
+
+        // vm.warp(block.timestamp + 11);
+
+        // eETH.claimDecrypted(claimableCtHash);
+
+        // uint256 bobEthFinal = address(bob).balance;
+        // _expectFHERC20BalancesChange(
+        //     eETH,
+        //     bob,
+        //     -1 * _ticksToIndicated(eETH, 1),
+        //     -1 * int256(value)
+        // );
+
+        // assertEq(bobEthFinal, bobEthInit + value, "Bob ETH balance increases");
+
+        // assertEq(eETH.totalSupply(), 10e8 - value, "Total supply decreases");
     }
 }

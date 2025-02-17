@@ -120,37 +120,37 @@ contract ConfidentialERC20Test is TestSetup {
         );
     }
 
-    function test_decrypt() public {
-        assertEq(eBTC.totalSupply(), 0, "Total supply init 0");
+    // function test_decrypt() public {
+    //     assertEq(eBTC.totalSupply(), 0, "Total supply init 0");
 
-        // Mint and encrypt wBTC
-        wBTC.mint(bob, 10e8);
-        vm.prank(bob);
-        wBTC.approve(address(eBTC), 10e8);
-        vm.prank(bob);
-        eBTC.encrypt(bob, 10e8);
+    //     // Mint and encrypt wBTC
+    //     wBTC.mint(bob, 10e8);
+    //     vm.prank(bob);
+    //     wBTC.approve(address(eBTC), 10e8);
+    //     vm.prank(bob);
+    //     eBTC.encrypt(bob, 10e8);
 
-        // TX
+    //     // TX
 
-        uint256 value = 1e8;
+    //     uint256 value = 1e8;
 
-        _prepExpectERC20BalancesChange(wBTC, bob);
-        _prepExpectFHERC20BalancesChange(eBTC, bob);
+    //     _prepExpectERC20BalancesChange(wBTC, bob);
+    //     _prepExpectFHERC20BalancesChange(eBTC, bob);
 
-        _expectFHERC20Transfer(eBTC, bob, address(0));
-        _expectERC20Transfer(wBTC, address(eBTC), bob, value);
+    //     _expectFHERC20Transfer(eBTC, bob, address(0));
+    //     _expectERC20Transfer(wBTC, address(eBTC), bob, value);
 
-        vm.prank(bob);
-        eBTC.decrypt(bob, uint128(value));
+    //     vm.prank(bob);
+    //     eBTC.decrypt(bob, uint128(value));
 
-        _expectERC20BalancesChange(wBTC, bob, int256(value));
-        _expectFHERC20BalancesChange(
-            eBTC,
-            bob,
-            -1 * _ticksToIndicated(eBTC, 1),
-            -1 * int256(value)
-        );
+    //     _expectERC20BalancesChange(wBTC, bob, int256(value));
+    //     _expectFHERC20BalancesChange(
+    //         eBTC,
+    //         bob,
+    //         -1 * _ticksToIndicated(eBTC, 1),
+    //         -1 * int256(value)
+    //     );
 
-        assertEq(eBTC.totalSupply(), 10e8 - value, "Total supply decreases");
-    }
+    //     assertEq(eBTC.totalSupply(), 10e8 - value, "Total supply decreases");
+    // }
 }

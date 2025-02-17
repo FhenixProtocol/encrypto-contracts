@@ -10,7 +10,7 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 import "@openzeppelin/contracts/utils/Strings.sol";
 import {FHERC20SigUtils} from "./FHERC20SigUtils.sol";
 import {CoFheTest} from "@fhenixprotocol/cofhe-foundry-mocks/CoFheTest.sol";
-import {euint128} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {euint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 
 abstract contract TestSetup is Test, IERC20Errors {
     CoFheTest public CFT;
