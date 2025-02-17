@@ -10,7 +10,7 @@ import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Cont
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {FHE, euint128, inEuint128, SealedUint, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -74,9 +74,6 @@ abstract contract FHERC20Upgradeable is
         string _symbol;
         uint8 _decimals;
         uint256 _indicatorTick;
-        mapping(address account => bytes32 sealingKey) _accountSealingKeys;
-        mapping(euint128 euint128 => mapping(bytes32 sealingKey => SealOutputRequest request)) _sealOutputRequests;
-        mapping(euint128 euint128 => DecryptRequest request) _decryptRequests;
     }
 
     // bytes32 private constant FHERC20StorageLocation =
@@ -124,6 +121,13 @@ abstract contract FHERC20Upgradeable is
     }
 
     function __FHERC20_init_unchained() internal onlyInitializing {}
+
+    /**
+     * @dev Returns true if the token is a FHERC20.
+     */
+    function isFherc20() public view virtual returns (bool) {
+        return true;
+    }
 
     /**
      * @dev Returns the name of the token.
@@ -210,136 +214,6 @@ abstract contract FHERC20Upgradeable is
     }
 
     /**
-     * @dev Requests an account's balance to be sealed. The result of the sealing
-     * operation will only be visible to parties in possession of the private key
-     * associated with the `sealingKey` passed as a parameter.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function sealBalanceOf(address account, bytes32 sealingKey) public virtual {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-
-        FHE.sealoutput($._encBalances[account], sealingKey);
-
-        $._accountSealingKeys[msg.sender] = sealingKey;
-
-        SealOutputRequest storage request = $._sealOutputRequests[
-            $._encBalances[account]
-        ][sealingKey];
-
-        request.account = account;
-        request.ctHash = $._encBalances[account];
-        request.status = RequestStatus.Pending;
-    }
-
-    /**
-     * @dev Function called by CoFHE with the result of a sealoutput request
-     */
-    function handleSealOutputResult(
-        uint256 ctHash,
-        string memory result,
-        address requestor
-    ) external override {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-
-        SealOutputRequest storage request = $._sealOutputRequests[
-            euint128.wrap(ctHash)
-        ][$._accountSealingKeys[requestor]];
-
-        request.result = result;
-        request.status = RequestStatus.Ready;
-
-        emit FHERC20SealOutputResultReady(
-            request.account,
-            ctHash,
-            result,
-            $._accountSealingKeys[requestor]
-        );
-    }
-
-    /**
-     * @dev Retrieves the sealed output result (if it is ready) that has been returned by the coprocessor.
-     *
-     * Requirements:
-     *
-     * - `account`
-     * - `sealingKey` must match the `sealingKey` passed into `sealBalanceOf`, or the result will not be found.
-     *
-     * Returns the sealed result as a `SealedUint` struct so that it can be automatically unsealed by `cofhe.js`.
-     */
-    function sealedBalanceOf(
-        address account,
-        bytes32 sealingKey
-    )
-        public
-        view
-        virtual
-        returns (SealOutputRequest memory request, SealedUint memory result)
-    {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-        request = $._sealOutputRequests[$._encBalances[account]][sealingKey];
-        result.data = request.result;
-        result.utype = Utils.EUINT128_TFHE;
-    }
-
-    /**
-     * @dev Requests an account's balance to be decrypted.
-     * See Fhenix CoFHE AccessControlList (ACL) for information on which accounts and
-     * contracts are permitted to request a decryption.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function decryptBalanceOf(address account) public virtual {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-
-        FHE.decrypt($._encBalances[account]);
-
-        DecryptRequest storage request = $._decryptRequests[
-            $._encBalances[account]
-        ];
-
-        request.account = account;
-        request.ctHash = $._encBalances[account];
-        request.status = RequestStatus.Pending;
-    }
-
-    /**
-     * @dev Function called by CoFHE with the result of a decrypt request
-     */
-    function handleDecryptResult(
-        uint256 ctHash,
-        uint256 result,
-        address
-    ) external override {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-
-        DecryptRequest storage request = $._decryptRequests[
-            euint128.wrap(ctHash)
-        ];
-
-        request.result = result;
-        request.status = RequestStatus.Ready;
-
-        emit FHERC20DecryptResultReady(request.account, ctHash, result);
-    }
-
-    /**
-     * @dev Retrieves the decrypted result (if it is ready) that has been returned by the coprocessor.
-     */
-    function decryptedBalanceOf(
-        address account
-    )
-        public
-        view
-        virtual
-        returns (DecryptRequest memory request, uint256 result)
-    {
-        FHERC20Storage storage $ = _getFHERC20Storage();
-        request = $._decryptRequests[$._encBalances[account]];
-        result = request.result;
-    }
-
-    /**
      * @dev See {IERC20-transfer}.
      * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20
      */
@@ -423,7 +297,7 @@ abstract contract FHERC20Upgradeable is
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
 
         if (inValue.hash != permit.value_hash)
-            revert FHERC20EncTransferFromValueMismatch(
+            revert FHERC20EncTransferFromValueHashMismatch(
                 inValue.hash,
                 permit.value_hash
             );

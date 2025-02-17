@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {euint128, inEuint128, SealedUint, IAsyncFHEReceiver} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {euint128, inEuint128, SealedUint} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -28,36 +28,7 @@ import {euint128, inEuint128, SealedUint, IAsyncFHEReceiver} from "@fhenixprotoc
  * Note: This FHERC20 does not include FHE operations, and is intended to decouple the
  * frontend work from the active CoFHE (FHE Coprocessor) work during development and auditing.
  */
-interface IFHERC20 is IERC20, IERC20Metadata, IAsyncFHEReceiver {
-    /**
-     * @dev Status indicating the state of the sealoutput or decrypt requests
-     */
-    enum RequestStatus {
-        NotRequested,
-        Pending,
-        Ready
-    }
-
-    /**
-     * @dev Struct that holds the data related to a sealing request
-     */
-    struct SealOutputRequest {
-        address account;
-        euint128 ctHash;
-        string result;
-        RequestStatus status;
-    }
-
-    /**
-     * @dev Struct that holds the data related to a decryption request
-     */
-    struct DecryptRequest {
-        address account;
-        euint128 ctHash;
-        uint256 result;
-        RequestStatus status;
-    }
-
+interface IFHERC20 is IERC20, IERC20Metadata {
     /**
      * @dev EIP712 Permit reusable struct
      */
@@ -72,23 +43,21 @@ interface IFHERC20 is IERC20, IERC20Metadata, IAsyncFHEReceiver {
     }
 
     /**
-     * @dev Emitted when `handleSealOutputResult` called by CoFHE coprocessor with seal output result
+     * @dev Emitted when `value_hash` encrypted tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
      */
-    event FHERC20SealOutputResultReady(
-        address indexed account,
-        uint256 indexed ctHash,
-        string result,
-        bytes32 sealingKey
+    event EncTransfer(
+        address indexed from,
+        address indexed to,
+        uint256 value_hash
     );
 
     /**
-     * @dev Emitted when `handleDecryptResult` called by CoFHE coprocessor with seal output result
+     * @dev Returns true if the token is a FHERC20.
      */
-    event FHERC20DecryptResultReady(
-        address indexed account,
-        uint256 indexed ctHash,
-        uint256 result
-    );
+    function isFherc20() external view returns (bool);
 
     /**
      * @dev Returns the name of the token.
@@ -155,67 +124,6 @@ interface IFHERC20 is IERC20, IERC20Metadata, IAsyncFHEReceiver {
      * Returns the euint128 representing the account's true balance (encrypted)
      */
     function encBalanceOf(address account) external view returns (euint128);
-
-    /**
-     * @dev Requests an account's balance to be sealed. The result of the sealing
-     * operation will only be visible to parties in possession of the private key
-     * associated with the `sealingKey` passed as a parameter.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function sealBalanceOf(address account, bytes32 sealingKey) external;
-
-    /**
-     * @dev Function called by CoFHE with the result of a sealoutput request
-     */
-    function handleSealOutputResult(
-        uint256 ctHash,
-        string memory result,
-        address requestor
-    ) external;
-
-    /**
-     * @dev Retrieves the sealed output result (if it is ready) that has been returned by the coprocessor.
-     *
-     * Requirements:
-     *
-     * - `account`
-     * - `sealingKey` must match the `sealingKey` passed into `sealBalanceOf`, or the result will not be found.
-     *
-     * Returns the sealed result as a `SealedUint` struct so that it can be automatically unsealed by `cofhe.js`.
-     */
-    function sealedBalanceOf(
-        address account,
-        bytes32 sealingKey
-    )
-        external
-        view
-        returns (SealOutputRequest memory request, SealedUint memory result);
-
-    /**
-     * @dev Requests an account's balance to be decrypted.
-     * See Fhenix CoFHE AccessControlList (ACL) for information on which accounts and
-     * contracts are permitted to request a decryption.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function decryptBalanceOf(address account) external;
-
-    /**
-     * @dev Function called by CoFHE with the result of a decrypt request
-     */
-    function handleDecryptResult(
-        uint256 ctHash,
-        uint256 result,
-        address requestor
-    ) external;
-
-    /**
-     * @dev Retrieves the decrypted result (if it is ready) that has been returned by the coprocessor.
-     */
-    function decryptedBalanceOf(
-        address account
-    ) external view returns (DecryptRequest memory request, uint256 result);
 
     /**
      * @dev See {IERC20-transfer}.

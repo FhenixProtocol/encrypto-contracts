@@ -3,6 +3,8 @@
 
 pragma solidity ^0.8.25;
 
+import {console} from "forge-std/Console.sol";
+
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
@@ -13,7 +15,7 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import {FHE, euint128, inEuint128, SealedUint, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
  * @dev Implementation of the {IERC20} interface.
@@ -72,11 +74,6 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     uint8 private _decimals;
     uint256 private _indicatorTick;
 
-    mapping(address account => bytes32 sealingKey) private _accountSealingKeys;
-    mapping(euint128 ctHash => mapping(bytes32 sealingKey => SealOutputRequest request))
-        private _sealOutputRequests;
-    mapping(euint128 ctHash => DecryptRequest request) private _decryptRequests;
-
     // EIP712 Permit
 
     bytes32 private constant PERMIT_TYPEHASH =
@@ -100,6 +97,13 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         _decimals = decimals_;
 
         _indicatorTick = 10 ** (decimals_ - 4);
+    }
+
+    /**
+     * @dev Returns true if the token is a FHERC20.
+     */
+    function isFherc20() public view virtual returns (bool) {
+        return true;
     }
 
     /**
@@ -187,127 +191,6 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     }
 
     /**
-     * @dev Requests an account's balance to be sealed. The result of the sealing
-     * operation will only be visible to parties in possession of the private key
-     * associated with the `sealingKey` passed as a parameter.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function sealBalanceOf(address account, bytes32 sealingKey) public virtual {
-        FHE.sealoutput(_encBalances[account], sealingKey);
-
-        _accountSealingKeys[msg.sender] = sealingKey;
-
-        SealOutputRequest storage request = _sealOutputRequests[
-            _encBalances[account]
-        ][sealingKey];
-
-        request.account = account;
-        request.ctHash = _encBalances[account];
-        request.status = RequestStatus.Pending;
-    }
-
-    /**
-     * @dev Function called by CoFHE with the result of a sealoutput request
-     */
-    function handleSealOutputResult(
-        uint256 ctHash,
-        string memory result,
-        address requestor
-    ) external override {
-        SealOutputRequest storage request = _sealOutputRequests[
-            euint128.wrap(ctHash)
-        ][_accountSealingKeys[requestor]];
-
-        request.result = result;
-        request.status = RequestStatus.Ready;
-
-        emit FHERC20SealOutputResultReady(
-            request.account,
-            ctHash,
-            result,
-            _accountSealingKeys[requestor]
-        );
-    }
-
-    /**
-     * @dev Retrieves the sealed output result (if it is ready) that has been returned by the coprocessor.
-     *
-     * Requirements:
-     *
-     * - `account`
-     * - `sealingKey` must match the `sealingKey` passed into `sealBalanceOf`, or the result will not be found.
-     *
-     * Returns the request associated with the account and sealing key.
-     * Returns the sealed result as a `SealedUint` struct so that it can be automatically unsealed by `cofhe.js`.
-     */
-    function sealedBalanceOf(
-        address account,
-        bytes32 sealingKey
-    )
-        public
-        view
-        virtual
-        returns (SealOutputRequest memory request, SealedUint memory result)
-    {
-        request = _sealOutputRequests[_encBalances[account]][sealingKey];
-        result.data = request.result;
-        result.utype = Utils.EUINT128_TFHE;
-    }
-
-    /**
-     * @dev Requests an account's balance to be decrypted.
-     * See Fhenix CoFHE AccessControlList (ACL) for information on which accounts and
-     * contracts are permitted to request a decryption.
-     *
-     * NOTE: Be very careful when overriding this function not to expose encrypted data.
-     */
-    function decryptBalanceOf(address account) public virtual {
-        FHE.decrypt(_encBalances[account]);
-
-        DecryptRequest storage request = _decryptRequests[
-            _encBalances[account]
-        ];
-
-        request.account = account;
-        request.ctHash = _encBalances[account];
-        request.status = RequestStatus.Pending;
-    }
-
-    /**
-     * @dev Function called by CoFHE with the result of a decrypt request
-     */
-    function handleDecryptResult(
-        uint256 ctHash,
-        uint256 result,
-        address
-    ) external override {
-        DecryptRequest storage request = _decryptRequests[
-            euint128.wrap(ctHash)
-        ];
-
-        request.result = result;
-        request.status = RequestStatus.Ready;
-
-        emit FHERC20DecryptResultReady(request.account, ctHash, result);
-    }
-
-    /**
-     * @dev Retrieves the decrypted result (if it is ready) that has been returned by the coprocessor.
-     */
-    function decryptedBalanceOf(
-        address account
-    )
-        public
-        view
-        virtual
-        returns (DecryptRequest memory request, uint256 result)
-    {
-        request = _decryptRequests[_encBalances[account]];
-        result = request.result;
-    }
-
-    /**
      * @dev See {IERC20-transfer}.
      * Always reverts to prevent FHERC20 from being unintentionally treated as an ERC20
      */
@@ -391,7 +274,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
 
         if (inValue.hash != permit.value_hash)
-            revert FHERC20EncTransferFromValueMismatch(
+            revert FHERC20EncTransferFromValueHashMismatch(
                 inValue.hash,
                 permit.value_hash
             );
@@ -479,17 +362,21 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         // If `value` is greater than the user's encBalance, it is replaced with 0
         // The transaction will succeed, but the amount transferred may be 0
         // Both `from` and `to` will have their `encBalance` updated in either case to preserve confidentiality
-
-        euint128 valueOr0 = FHE.select(
-            value.lte(_encBalances[from]),
-            value,
-            FHE.asEuint128(0)
-        );
+        //
+        // NOTE: If the function is `_mint`, `from` is the zero address, and does not have an `encBalance` to
+        //       compare against, so this check is skipped.
+        if (from != address(0)) {
+            value = FHE.select(
+                value.lte(_encBalances[from]),
+                value,
+                FHE.asEuint128(0)
+            );
+        }
 
         if (from == address(0)) {
             _totalSupply += cleartextValue;
         } else {
-            _encBalances[from] = FHE.sub(_encBalances[from], valueOr0);
+            _encBalances[from] = FHE.sub(_encBalances[from], value);
             _indicatedBalances[from] = _decrementIndicator(
                 _indicatedBalances[from]
             );
@@ -498,19 +385,26 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (to == address(0)) {
             _totalSupply -= cleartextValue;
         } else {
-            _encBalances[to] = FHE.add(_encBalances[to], valueOr0);
+            _encBalances[to] = FHE.add(_encBalances[to], value);
             _indicatedBalances[to] = _incrementIndicator(
                 _indicatedBalances[to]
             );
         }
 
         // Update CoFHE Access Control List (ACL) to allow decrypting / sealing of the new balances
-        FHE.allowThis(_encBalances[from]);
-        FHE.allowThis(_encBalances[to]);
-        FHE.allow(_encBalances[from], from);
-        FHE.allow(_encBalances[to], to);
+        if (euint128.unwrap(_encBalances[from]) != 0) {
+            FHE.allowThis(_encBalances[from]);
+            FHE.allow(_encBalances[from], from);
+            FHE.allow(value, from);
+        }
+        if (euint128.unwrap(_encBalances[to]) != 0) {
+            FHE.allowThis(_encBalances[to]);
+            FHE.allow(_encBalances[to], to);
+            FHE.allow(value, to);
+        }
 
         emit Transfer(from, to, _indicatorTick);
+        emit EncTransfer(from, to, euint128.unwrap(value));
     }
 
     /**
