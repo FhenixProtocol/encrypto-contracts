@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {ERC20_Harness} from "./ERC20_Harness.sol";
 import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
@@ -120,37 +119,57 @@ contract ConfidentialERC20Test is TestSetup {
         );
     }
 
-    // function test_decrypt() public {
-    //     assertEq(eBTC.totalSupply(), 0, "Total supply init 0");
+    function test_decrypt() public {
+        assertEq(eBTC.totalSupply(), 0, "Total supply init 0");
 
-    //     // Mint and encrypt wBTC
-    //     wBTC.mint(bob, 10e8);
-    //     vm.prank(bob);
-    //     wBTC.approve(address(eBTC), 10e8);
-    //     vm.prank(bob);
-    //     eBTC.encrypt(bob, 10e8);
+        // Mint and encrypt wBTC
+        wBTC.mint(bob, 10e8);
 
-    //     // TX
+        vm.prank(bob);
+        wBTC.approve(address(eBTC), 10e8);
 
-    //     uint256 value = 1e8;
+        vm.prank(bob);
+        eBTC.encrypt(bob, 10e8);
 
-    //     _prepExpectERC20BalancesChange(wBTC, bob);
-    //     _prepExpectFHERC20BalancesChange(eBTC, bob);
+        // TX
 
-    //     _expectFHERC20Transfer(eBTC, bob, address(0));
-    //     _expectERC20Transfer(wBTC, address(eBTC), bob, value);
+        uint256 value = 1e8;
 
-    //     vm.prank(bob);
-    //     eBTC.decrypt(bob, uint128(value));
+        _prepExpectERC20BalancesChange(wBTC, bob);
+        _prepExpectFHERC20BalancesChange(eBTC, bob);
 
-    //     _expectERC20BalancesChange(wBTC, bob, int256(value));
-    //     _expectFHERC20BalancesChange(
-    //         eBTC,
-    //         bob,
-    //         -1 * _ticksToIndicated(eBTC, 1),
-    //         -1 * int256(value)
-    //     );
+        _expectFHERC20Transfer(eBTC, bob, address(0));
 
-    //     assertEq(eBTC.totalSupply(), 10e8 - value, "Total supply decreases");
-    // }
+        vm.prank(bob);
+        eBTC.decrypt(bob, uint128(value));
+
+        // Decrypt inserts a claimable amount into the user's claimable set
+
+        uint256[] memory claimable = eBTC.userClaimable(bob);
+        assertEq(claimable.length, 1, "Bob has 1 claimable amount");
+        uint256 claimableCtHash = claimable[0];
+        assertEq(
+            eBTC.claimed(claimableCtHash),
+            false,
+            "Claimable amount not claimed"
+        );
+        CFT.assertStoredValue(claimableCtHash, value);
+
+        // Claiming the amount will remove it from the user's claimable set
+
+        vm.warp(block.timestamp + 11);
+
+        _expectERC20Transfer(wBTC, address(eBTC), bob, value);
+        eBTC.claimDecrypted(claimableCtHash);
+
+        _expectERC20BalancesChange(wBTC, bob, int256(value));
+        _expectFHERC20BalancesChange(
+            eBTC,
+            bob,
+            -1 * _ticksToIndicated(eBTC, 1),
+            -1 * int256(value)
+        );
+
+        assertEq(eBTC.totalSupply(), 10e8 - value, "Total supply decreases");
+    }
 }

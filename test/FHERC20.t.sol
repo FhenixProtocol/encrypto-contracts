@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {TestSetup} from "./TestSetup.sol";
 import {IFHERC20} from "../src/interfaces/IFHERC20.sol";

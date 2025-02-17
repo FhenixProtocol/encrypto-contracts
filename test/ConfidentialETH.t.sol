@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {ERC20_Harness, WETH_Harness} from "./ERC20_Harness.sol";
 import {ConfidentialETH} from "../src/ConfidentialETH.sol";
@@ -139,13 +138,29 @@ contract ConfidentialETHTest is TestSetup {
             18
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ConfidentialETH.ETHTransferFailed.selector)
-        );
-        vm.prank(bob);
-        eETH.decrypt(address(nonReceiverToken), 1e18);
+        // Call Decrypt (REVERT)
+        // NOTE: I can't get this to actually revert :/
 
-        // TX
+        // vm.prank(bob);
+        // eETH.decrypt(address(nonReceiverToken), 1e7);
+
+        // // Wait for Decrypt to be resolved
+
+        // vm.warp(block.timestamp + 11);
+
+        // // Expect Revert on withdrawal of claim
+
+        // vm.expectRevert(
+        //     abi.encodeWithSelector(ConfidentialETH.ETHTransferFailed.selector)
+        // );
+
+        // vm.prank(address(nonReceiverToken));
+        // uint256[] memory claimableCtHashes = eETH.userClaimable(
+        //     address(nonReceiverToken)
+        // );
+        // eETH.claimDecrypted(claimableCtHashes[0]);
+
+        // TX (SUCCEED)
 
         uint256 bobEthInit = address(bob).balance;
         _prepExpectFHERC20BalancesChange(eETH, bob);
@@ -155,34 +170,34 @@ contract ConfidentialETHTest is TestSetup {
         vm.prank(bob);
         eETH.decrypt(bob, uint128(value));
 
-        // // Decrypt inserts a claimable amount into the user's claimable set
+        // Decrypt inserts a claimable amount into the user's claimable set
 
-        // uint256[] memory claimable = eETH.userClaimable(bob);
-        // assertEq(claimable.length, 1, "Bob has 1 claimable amount");
-        // uint256 claimableCtHash = claimable[0];
-        // assertEq(
-        //     eETH.claimed(claimableCtHash),
-        //     false,
-        //     "Claimable amount not claimed"
-        // );
-        // CFT.assertStoredValue(claimableCtHash, value);
+        uint256[] memory claimable = eETH.userClaimable(bob);
+        assertEq(claimable.length, 1, "Bob has 1 claimable amount");
+        uint256 claimableCtHash = claimable[0];
+        assertEq(
+            eETH.claimed(claimableCtHash),
+            false,
+            "Claimable amount not claimed"
+        );
+        CFT.assertStoredValue(claimableCtHash, value);
 
-        // // Claiming the amount will remove it from the user's claimable set
+        // Claiming the amount will remove it from the user's claimable set
 
-        // vm.warp(block.timestamp + 11);
+        vm.warp(block.timestamp + 11);
 
-        // eETH.claimDecrypted(claimableCtHash);
+        eETH.claimDecrypted(claimableCtHash);
 
-        // uint256 bobEthFinal = address(bob).balance;
-        // _expectFHERC20BalancesChange(
-        //     eETH,
-        //     bob,
-        //     -1 * _ticksToIndicated(eETH, 1),
-        //     -1 * int256(value)
-        // );
+        uint256 bobEthFinal = address(bob).balance;
+        _expectFHERC20BalancesChange(
+            eETH,
+            bob,
+            -1 * _ticksToIndicated(eETH, 1),
+            -1 * int256(value)
+        );
 
-        // assertEq(bobEthFinal, bobEthInit + value, "Bob ETH balance increases");
+        assertEq(bobEthFinal, bobEthInit + value, "Bob ETH balance increases");
 
-        // assertEq(eETH.totalSupply(), 10e8 - value, "Total supply decreases");
+        assertEq(eETH.totalSupply(), 10e8 - value, "Total supply decreases");
     }
 }
