@@ -8,19 +8,12 @@ import {FHERC20} from "./FHERC20.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ConfidentialClaim} from "./ConfidentialClaim.sol";
 
-contract ConfidentialETH is FHERC20, Ownable {
+contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
 
     IWETH public wETH;
-
-    mapping(uint256 ctHash => address) public claimableBy;
-    mapping(uint256 ctHash => bool) public claimed;
-
-    mapping(address => EnumerableSet.UintSet) private _userClaimable;
-
-    error NotFound();
-    error AlreadyClaimed();
 
     constructor(
         IWETH wETH_
@@ -54,8 +47,7 @@ contract ConfidentialETH is FHERC20, Ownable {
     function decrypt(address to, uint128 value) public {
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
-        claimableBy[euint128.unwrap(burned)] = to;
-        _userClaimable[to].add(euint128.unwrap(burned));
+        _createClaim(to, value, burned);
     }
 
     /**
@@ -63,27 +55,10 @@ contract ConfidentialETH is FHERC20, Ownable {
      * @param ctHash The ctHash of the burned amount
      */
     function claimDecrypted(uint256 ctHash) public {
-        // Check that the claimable amount exists and has not been claimed yet
-        if (claimableBy[ctHash] == address(0)) revert NotFound();
-        if (claimed[ctHash]) revert AlreadyClaimed();
-
-        // Get the decrypted amount (reverts if the amount is not decrypted yet)
-        uint256 amount = FHE.getDecryptResult(ctHash);
+        Claim memory claim = _handleClaim(ctHash);
 
         // Send the ETH to the recipient
-        (bool sent, ) = claimableBy[ctHash].call{value: amount}("");
+        (bool sent, ) = claim.to.call{value: claim.decryptedAmount}("");
         if (!sent) revert ETHTransferFailed();
-
-        // Mark the amount as claimed
-        claimed[ctHash] = true;
-
-        // Remove the claimable amount from the user's claimable set
-        _userClaimable[claimableBy[ctHash]].remove(ctHash);
-    }
-
-    function userClaimable(
-        address user
-    ) public view returns (uint256[] memory) {
-        return _userClaimable[user].values();
     }
 }

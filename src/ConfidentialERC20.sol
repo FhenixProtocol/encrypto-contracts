@@ -8,20 +8,13 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IFHERC20, FHERC20} from "./FHERC20.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ConfidentialClaim} from "./ConfidentialClaim.sol";
 
-contract ConfidentialERC20 is FHERC20, Ownable {
+contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
 
     IERC20 private immutable _erc20;
     string private _symbol;
-
-    mapping(uint256 ctHash => address) public claimableBy;
-    mapping(uint256 ctHash => bool) public claimed;
-
-    mapping(address => EnumerableSet.UintSet) private _userClaimable;
-
-    error NotFound();
-    error AlreadyClaimed();
 
     /**
      * @dev The erc20 token couldn't be wrapped.
@@ -82,35 +75,17 @@ contract ConfidentialERC20 is FHERC20, Ownable {
     function decrypt(address to, uint128 value) public {
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
-        claimableBy[euint128.unwrap(burned)] = to;
-        _userClaimable[to].add(euint128.unwrap(burned));
+        _createClaim(to, value, burned);
     }
 
     /**
-     * @notice Claim a decrypted amount of ETH
+     * @notice Claim a decrypted amount of the underlying ERC20
      * @param ctHash The ctHash of the burned amount
      */
     function claimDecrypted(uint256 ctHash) public {
-        // Check that the claimable amount exists and has not been claimed yet
-        if (claimableBy[ctHash] == address(0)) revert NotFound();
-        if (claimed[ctHash]) revert AlreadyClaimed();
-
-        // Get the decrypted amount (reverts if the amount is not decrypted yet)
-        uint256 amount = FHE.getDecryptResult(ctHash);
+        Claim memory claim = _handleClaim(ctHash);
 
         // Send the ERC20 to the recipient
-        IERC20(_erc20).transfer(claimableBy[ctHash], amount);
-
-        // Mark the amount as claimed
-        claimed[ctHash] = true;
-
-        // Remove the claimable amount from the user's claimable set
-        _userClaimable[claimableBy[ctHash]].remove(ctHash);
-    }
-
-    function userClaimable(
-        address user
-    ) public view returns (uint256[] memory) {
-        return _userClaimable[user].values();
+        IERC20(_erc20).transfer(claim.to, claim.decryptedAmount);
     }
 }

@@ -8,13 +8,16 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ConfidentialERC20} from "./ConfidentialERC20.sol";
 import {ConfidentialETH} from "./ConfidentialETH.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 contract RedactedCore is Ownable {
-    mapping(address erc20 => address fherc20) private _fherc20Map;
+    using EnumerableMap for EnumerableMap.AddressToAddressMap;
+
+    EnumerableMap.AddressToAddressMap private _fherc20Map;
 
     // Confidential ETH :: ETH / wETH deposited into Redacted are routed to eETH
-    IWETH public wETH;
-    ConfidentialETH public eETH;
+    IWETH public immutable wETH;
+    ConfidentialETH public immutable eETH;
 
     // Stablecoins :: deposited stablecoins are routed to FUSD
     mapping(address erc20 => bool isStablecoin) public _stablecoins;
@@ -24,7 +27,7 @@ contract RedactedCore is Ownable {
         eETH = eETH_;
     }
 
-    event Fherc20Deployed(address erc20, address fherc20);
+    event Fherc20Deployed(address indexed erc20, address indexed fherc20);
 
     error Invalid_AlreadyDeployed();
     error Invalid_Stablecoin();
@@ -38,7 +41,9 @@ contract RedactedCore is Ownable {
     }
 
     function getFherc20(address erc20) public view returns (address) {
-        return _fherc20Map[erc20];
+        (bool exists, address fherc20) = _fherc20Map.tryGet(erc20);
+        if (!exists) return address(0);
+        return fherc20;
     }
 
     function getIsStablecoin(address erc20) public view returns (bool) {
@@ -57,15 +62,36 @@ contract RedactedCore is Ownable {
     }
 
     function deployFherc20(IERC20 erc20) public {
-        if (_fherc20Map[address(erc20)] != address(0))
+        if (_fherc20Map.contains(address(erc20)))
             revert Invalid_AlreadyDeployed();
 
         if (_stablecoins[address(erc20)]) revert Invalid_Stablecoin();
         if (address(erc20) == address(wETH)) revert Invalid_WETH();
 
         ConfidentialERC20 fherc20 = new ConfidentialERC20(erc20, "");
-        _fherc20Map[address(erc20)] = address(fherc20);
+        _fherc20Map.set(address(erc20), address(fherc20));
 
         emit Fherc20Deployed(address(erc20), address(fherc20));
+    }
+
+    struct MappedERC20 {
+        address erc20;
+        address fherc20;
+    }
+
+    function getDeployedFherc20s()
+        public
+        view
+        returns (MappedERC20[] memory mappedFherc20s)
+    {
+        mappedFherc20s = new MappedERC20[](_fherc20Map.length());
+
+        address _mapErc20;
+        address _mapFherc20;
+
+        for (uint256 i = 0; i < _fherc20Map.length(); i++) {
+            (_mapErc20, _mapFherc20) = _fherc20Map.at(i);
+            mappedFherc20s[i] = MappedERC20(_mapErc20, _mapFherc20);
+        }
     }
 }
