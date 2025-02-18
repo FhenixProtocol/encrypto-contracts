@@ -77,6 +77,7 @@ contract RedactedCore is Ownable {
     struct MappedERC20 {
         address erc20;
         address fherc20;
+        bool isStablecoin;
     }
 
     function getDeployedFherc20s()
@@ -91,7 +92,7 @@ contract RedactedCore is Ownable {
 
         for (uint256 i = 0; i < _fherc20Map.length(); i++) {
             (_mapErc20, _mapFherc20) = _fherc20Map.at(i);
-            mappedFherc20s[i] = MappedERC20(_mapErc20, _mapFherc20);
+            mappedFherc20s[i] = MappedERC20(_mapErc20, _mapFherc20, getIsStablecoin(_mapErc20));
         }
     }
 }
