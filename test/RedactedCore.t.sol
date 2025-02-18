@@ -77,6 +77,10 @@ contract RedactedCoreTest is TestSetup {
         vm.prank(owner);
         redactedCore.updateStablecoin(address(USDC), true);
 
+        RedactedCore.MappedERC20[] memory deployedFherc20s = redactedCore
+            .getDeployedFherc20s();
+        assertEq(deployedFherc20s.length, 0, "No FHERC20s deployed");
+
         // revert - stablecoin
 
         vm.expectRevert(
@@ -91,6 +95,9 @@ contract RedactedCoreTest is TestSetup {
         );
         redactedCore.deployFherc20(wETH);
 
+        deployedFherc20s = redactedCore.getDeployedFherc20s();
+        assertEq(deployedFherc20s.length, 0, "No FHERC20s deployed");
+
         // success
 
         ERC20_Harness wBTC = new ERC20_Harness("Wrapped BTC", "wBTC", 8);
@@ -99,6 +106,20 @@ contract RedactedCoreTest is TestSetup {
         // Address of ewBTC unknown at this point
         emit RedactedCore.Fherc20Deployed(address(wBTC), address(0));
         redactedCore.deployFherc20(wBTC);
+
+        // Expectations after deploy
+
+        address deployedFherc20 = redactedCore.getFherc20(address(wBTC));
+        assertNotEq(deployedFherc20, address(0), "ewBTC deployed");
+
+        deployedFherc20s = redactedCore.getDeployedFherc20s();
+        assertEq(deployedFherc20s.length, 1, "1 FHERC20 deployed");
+        assertEq(deployedFherc20s[0].erc20, address(wBTC), "wBTC deployed");
+        assertEq(
+            deployedFherc20s[0].fherc20,
+            deployedFherc20,
+            "deployed ewBTC matches"
+        );
 
         // revert - already deployed
 
