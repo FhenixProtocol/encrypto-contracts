@@ -102,7 +102,7 @@ contract RedactedCoreTest is TestSetup {
 
         ERC20_Harness wBTC = new ERC20_Harness("Wrapped BTC", "wBTC", 8);
 
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit(true, false, false, false);
         // Address of ewBTC unknown at this point
         emit RedactedCore.Fherc20Deployed(address(wBTC), address(0));
         redactedCore.deployFherc20(wBTC);

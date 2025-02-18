@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {FHERC20} from "./FHERC20_Harness.sol";
 import {ERC20_Harness} from "./ERC20_Harness.sol";
 import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
 import {TestSetup} from "./TestSetup.sol";
@@ -145,11 +144,11 @@ contract ConfidentialERC20Test is TestSetup {
 
         // Decrypt inserts a claimable amount into the user's claimable set
 
-        uint256[] memory claimable = eBTC.userClaimable(bob);
-        assertEq(claimable.length, 1, "Bob has 1 claimable amount");
-        uint256 claimableCtHash = claimable[0];
+        ConfidentialERC20.Claim[] memory claims = eBTC.getUserClaims(bob);
+        assertEq(claims.length, 1, "Bob has 1 claimable amount");
+        uint256 claimableCtHash = claims[0].ctHash;
         assertEq(
-            eBTC.claimed(claimableCtHash),
+            eBTC.getClaim(claimableCtHash).claimed,
             false,
             "Claimable amount not claimed"
         );

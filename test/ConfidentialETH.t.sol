@@ -172,19 +172,45 @@ contract ConfidentialETHTest is TestSetup {
 
         // Decrypt inserts a claimable amount into the user's claimable set
 
-        uint256[] memory claimable = eETH.userClaimable(bob);
+        ConfidentialETH.Claim[] memory claimable = eETH.getUserClaims(bob);
         assertEq(claimable.length, 1, "Bob has 1 claimable amount");
-        uint256 claimableCtHash = claimable[0];
+        uint256 claimableCtHash = claimable[0].ctHash;
+        assertEq(claimable[0].claimed, false, "Claimable amount not claimed");
         assertEq(
-            eETH.claimed(claimableCtHash),
-            false,
-            "Claimable amount not claimed"
+            claimable[0].requestedAmount,
+            value,
+            "Claimable amount requested"
         );
+        assertEq(claimable[0].to, bob, "Claimable amount to bob");
         CFT.assertStoredValue(claimableCtHash, value);
 
-        // Claiming the amount will remove it from the user's claimable set
+        // - On decrypt, the amount is not decrypted yet
+        assertEq(
+            claimable[0].decryptedAmount,
+            0,
+            "Decrypted claimable amount not populated yet"
+        );
+        assertEq(
+            claimable[0].decrypted,
+            false,
+            "Claimable amount has not been decrypted"
+        );
 
+        // - after delay, the amount is decrypted successfully
         vm.warp(block.timestamp + 11);
+        claimable = eETH.getUserClaims(bob);
+        assertEq(
+            claimable[0].decryptedAmount,
+            value,
+            "Decrypted claimable amount correct"
+        );
+        assertEq(
+            claimable[0].decrypted,
+            true,
+            "Claimable amount has been decrypted"
+        );
+
+        // Claiming the amount will remove it from the user's claimable set
 
         eETH.claimDecrypted(claimableCtHash);
 
