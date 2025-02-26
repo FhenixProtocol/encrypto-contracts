@@ -5,8 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
@@ -97,11 +96,10 @@ abstract contract FHERC20Upgradeable is
 
     // EIP712 Permit
 
-    // bytes32 private constant PERMIT_TYPEHASH =
-    //     keccak256(
-    //         "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
-    //     );
-    bytes32 private constant PERMIT_TYPEHASH = 0x0;
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
+        );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -133,7 +131,7 @@ abstract contract FHERC20Upgradeable is
         string memory name_,
         string memory symbol_,
         uint8 decimals_
-    ) internal initializer {
+    ) internal onlyInitializing {
         FHERC20Storage storage $ = _getFHERC20Storage();
         $._name = name_;
         $._symbol = symbol_;
