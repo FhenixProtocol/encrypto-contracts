@@ -36,11 +36,11 @@ import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-foundry-mo
 abstract contract FHERC20Upgradeable is
     IFHERC20,
     IFHERC20Errors,
-    UUPSUpgradeable,
     Initializable,
     ContextUpgradeable,
     EIP712Upgradeable,
-    NoncesUpgradeable
+    NoncesUpgradeable,
+    UUPSUpgradeable
 {
     struct FHERC20Storage {
         // NOTE: `indicatedBalances` are intended to indicate movement and change
