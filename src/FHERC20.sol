@@ -267,7 +267,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
-        if (to != permit.spender)
+        if (msg.sender != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
 
         if (inValue.hash != permit.value_hash)

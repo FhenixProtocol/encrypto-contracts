@@ -292,7 +292,7 @@ abstract contract FHERC20Upgradeable is
 
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
-        if (to != permit.spender)
+        if (msg.sender != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
 
         if (inValue.hash != permit.value_hash)
