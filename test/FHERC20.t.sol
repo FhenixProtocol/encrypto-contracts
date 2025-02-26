@@ -162,7 +162,111 @@ contract FHERC20Test is TestSetup {
         );
     }
 
-    function test_EncTransferFrom() public {
+    function test_EncTransferFrom_Success_BobToAliceViaAlice() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+        inEuint128 memory inValue;
+
+        // Success - Bob -> Alice (called by Alice, nonce = 0)
+
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
+
+        _prepExpectFHERC20BalancesChange(XXX, bob);
+        _prepExpectFHERC20BalancesChange(XXX, alice);
+
+        _expectFHERC20Transfer(XXX, bob, alice);
+        vm.prank(alice);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
+
+        _expectFHERC20BalancesChange(
+            XXX,
+            bob,
+            -1 * _ticksToIndicated(XXX, 1),
+            -1 * 1e18
+        );
+        _expectFHERC20BalancesChange(
+            XXX,
+            alice,
+            _ticksToIndicated(XXX, 1),
+            1e18
+        );
+
+        // Success - Bob -> Alice (called by Alice, nonce = 1)
+
+        inValue = CFT.createInEuint128(1e18, 0);
+        permit = generateTransferFromPermit(
+            XXX,
+            bobPK,
+            bob,
+            alice,
+            inValue.hash
+        );
+
+        _prepExpectFHERC20BalancesChange(XXX, bob);
+        _prepExpectFHERC20BalancesChange(XXX, alice);
+
+        _expectFHERC20Transfer(XXX, bob, alice);
+        vm.prank(alice);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
+
+        _expectFHERC20BalancesChange(
+            XXX,
+            bob,
+            -1 * _ticksToIndicated(XXX, 1),
+            -1 * 1e18
+        );
+        _expectFHERC20BalancesChange(
+            XXX,
+            alice,
+            _ticksToIndicated(XXX, 1),
+            1e18
+        );
+    }
+
+    function test_EncTransferFrom_Success_BobToAliceViaEve() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
+
+        // Valid
+
+        permit = generateTransferFromPermit(XXX, bobPK, bob, eve, inValue.hash);
+
+        _prepExpectFHERC20BalancesChange(XXX, bob);
+        _prepExpectFHERC20BalancesChange(XXX, alice);
+        _prepExpectFHERC20BalancesChange(XXX, eve);
+
+        _expectFHERC20Transfer(XXX, bob, alice);
+
+        vm.prank(eve);
+        XXX.encTransferFrom(bob, alice, inValue, permit);
+
+        _expectFHERC20BalancesChange(
+            XXX,
+            bob,
+            -1 * _ticksToIndicated(XXX, 1),
+            -1 * 1e18
+        );
+        _expectFHERC20BalancesChange(
+            XXX,
+            alice,
+            _ticksToIndicated(XXX, 1),
+            1e18
+        );
+        _expectFHERC20BalancesChange(XXX, eve, _ticksToIndicated(XXX, 0), 0);
+    }
+
+    function test_EncTransferFrom_Revert_ERC20InvalidReceiver() public {
         XXX.mint(bob, 10e18);
         XXX.mint(alice, 10e18);
         IFHERC20.FHERC20_EIP712_Permit memory permit;
@@ -174,105 +278,15 @@ contract FHERC20Test is TestSetup {
             XXX,
             bobPK,
             bob,
-            address(0),
+            alice,
             inValue.hash
         );
 
         vm.expectRevert(
             abi.encodeWithSelector(ERC20InvalidReceiver.selector, address(0))
         );
-        vm.prank(address(0));
+        vm.prank(alice);
         XXX.encTransferFrom(bob, address(0), inValue, permit);
-
-        // Success - Bob -> Alice (called by Bob, nonce = 0)
-
-        inValue = CFT.createInEuint128(1e18, 0);
-        permit = generateTransferFromPermit(
-            XXX,
-            bobPK,
-            bob,
-            alice,
-            inValue.hash
-        );
-
-        _prepExpectFHERC20BalancesChange(XXX, bob);
-        _prepExpectFHERC20BalancesChange(XXX, alice);
-
-        _expectFHERC20Transfer(XXX, bob, alice);
-        XXX.encTransferFrom(bob, alice, inValue, permit);
-
-        _expectFHERC20BalancesChange(
-            XXX,
-            bob,
-            -1 * _ticksToIndicated(XXX, 1),
-            -1 * 1e18
-        );
-        _expectFHERC20BalancesChange(
-            XXX,
-            alice,
-            _ticksToIndicated(XXX, 1),
-            1e18
-        );
-
-        // Success - Bob -> Alice (called by Bob, nonce = 1)
-
-        inValue = CFT.createInEuint128(1e18, 0);
-        permit = generateTransferFromPermit(
-            XXX,
-            bobPK,
-            bob,
-            alice,
-            inValue.hash
-        );
-
-        _prepExpectFHERC20BalancesChange(XXX, bob);
-        _prepExpectFHERC20BalancesChange(XXX, alice);
-
-        _expectFHERC20Transfer(XXX, bob, alice);
-        XXX.encTransferFrom(bob, alice, inValue, permit);
-
-        _expectFHERC20BalancesChange(
-            XXX,
-            bob,
-            -1 * _ticksToIndicated(XXX, 1),
-            -1 * 1e18
-        );
-        _expectFHERC20BalancesChange(
-            XXX,
-            alice,
-            _ticksToIndicated(XXX, 1),
-            1e18
-        );
-
-        // Success - Alice -> Bob (called by Bob)
-
-        inValue = CFT.createInEuint128(1e18, 0);
-        permit = generateTransferFromPermit(
-            XXX,
-            alicePK,
-            alice,
-            bob,
-            inValue.hash
-        );
-
-        _prepExpectFHERC20BalancesChange(XXX, alice);
-        _prepExpectFHERC20BalancesChange(XXX, bob);
-
-        _expectFHERC20Transfer(XXX, alice, bob);
-        XXX.encTransferFrom(alice, bob, inValue, permit);
-
-        _expectFHERC20BalancesChange(
-            XXX,
-            alice,
-            -1 * _ticksToIndicated(XXX, 1),
-            -1 * 1e18
-        );
-        _expectFHERC20BalancesChange(
-            XXX,
-            bob,
-            1 * _ticksToIndicated(XXX, 1),
-            1 * 1e18
-        );
     }
 
     function test_EncTransferFrom_Revert_Expired() public {
@@ -394,6 +408,7 @@ contract FHERC20Test is TestSetup {
                 alice
             )
         );
+        vm.prank(eve);
         XXX.encTransferFrom(bob, eve, inValue, permit);
     }
 
