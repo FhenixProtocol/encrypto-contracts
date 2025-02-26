@@ -181,7 +181,7 @@ contract FHERC20Test is TestSetup {
         vm.expectRevert(
             abi.encodeWithSelector(ERC20InvalidReceiver.selector, address(0))
         );
-        vm.prank(bob);
+        vm.prank(address(0));
         XXX.encTransferFrom(bob, address(0), inValue, permit);
 
         // Success - Bob -> Alice (called by Bob, nonce = 0)
@@ -275,7 +275,7 @@ contract FHERC20Test is TestSetup {
         );
     }
 
-    function test_EncTransferFrom_PermitReversions() public {
+    function test_EncTransferFrom_Revert_Expired() public {
         XXX.mint(bob, 10e18);
         XXX.mint(alice, 10e18);
         IFHERC20.FHERC20_EIP712_Permit memory permit;
@@ -291,6 +291,7 @@ contract FHERC20Test is TestSetup {
             alice,
             inValue.hash
         );
+        vm.prank(alice);
         XXX.encTransferFrom(bob, alice, inValue, permit);
 
         // Deadline passed - ERC2612ExpiredSignature
@@ -311,7 +312,16 @@ contract FHERC20Test is TestSetup {
                 permit.deadline
             )
         );
+        vm.prank(alice);
         XXX.encTransferFrom(bob, alice, inValue, permit);
+    }
+
+    function test_EncTransferFrom_Revert_OwnerMismatch_BobToEve() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // FHERC20EncTransferFromOwnerMismatch bob -> eve
 
@@ -331,6 +341,14 @@ contract FHERC20Test is TestSetup {
             )
         );
         XXX.encTransferFrom(bob, alice, inValue, permit);
+    }
+
+    function test_EncTransferFrom_Revert_OwnerMismatch_EveToBob() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // FHERC20EncTransferFromOwnerMismatch eve -> bob
 
@@ -350,6 +368,14 @@ contract FHERC20Test is TestSetup {
             )
         );
         XXX.encTransferFrom(eve, alice, inValue, permit);
+    }
+
+    function test_EncTransferFrom_Revert_SpenderMismatch() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // FHERC20EncTransferFromSpenderMismatch
 
@@ -369,6 +395,14 @@ contract FHERC20Test is TestSetup {
             )
         );
         XXX.encTransferFrom(bob, eve, inValue, permit);
+    }
+
+    function test_EncTransferFrom_Revert_ValueHashMismatch() public {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // FHERC20EncTransferFromValueHashMismatch
 
@@ -388,7 +422,18 @@ contract FHERC20Test is TestSetup {
                 inValue.hash
             )
         );
+        vm.prank(alice);
         XXX.encTransferFrom(bob, alice, inValueMismatch, permit);
+    }
+
+    function test_EncTransferFrom_Revert_ERC2612InvalidSigner_SignerNotOwner()
+        public
+    {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // Signer != owner - ERC2612InvalidSigner
 
@@ -407,7 +452,18 @@ contract FHERC20Test is TestSetup {
                 bob
             )
         );
+        vm.prank(alice);
         XXX.encTransferFrom(bob, alice, inValue, permit);
+    }
+
+    function test_EncTransferFrom_Revert_ERC2612InvalidSigner_InvalidNonce()
+        public
+    {
+        XXX.mint(bob, 10e18);
+        XXX.mint(alice, 10e18);
+        IFHERC20.FHERC20_EIP712_Permit memory permit;
+
+        inEuint128 memory inValue = CFT.createInEuint128(1e18, 0);
 
         // Invalid nonce - ERC2612InvalidSigner
 
@@ -417,10 +473,11 @@ contract FHERC20Test is TestSetup {
             bob,
             alice,
             inValue.hash,
-            XXX.nonces(bob) - 1,
+            XXX.nonces(bob) + 1,
             1 days
         );
         vm.expectPartialRevert(IFHERC20Errors.ERC2612InvalidSigner.selector);
+        vm.prank(alice);
         XXX.encTransferFrom(bob, alice, inValue, permit);
     }
 }
