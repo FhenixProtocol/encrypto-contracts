@@ -436,7 +436,7 @@ abstract contract FHERC20Upgradeable is
         if (to == address(0)) {
             $._totalSupply -= cleartextValue;
         } else {
-            $._encBalances[from] = FHE.add($._encBalances[from], transferred);
+            $._encBalances[to] = FHE.add($._encBalances[to], transferred);
             $._indicatedBalances[to] = _incrementIndicator(
                 $._indicatedBalances[to]
             );
