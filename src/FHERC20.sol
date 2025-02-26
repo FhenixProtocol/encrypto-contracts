@@ -480,4 +480,10 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
         return _domainSeparatorV4();
     }
+
+    // FHERC20
+
+    function resetIndicatedBalance() external {
+        _indicatedBalances[msg.sender] = 0;
+    }
 }

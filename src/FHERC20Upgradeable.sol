@@ -504,4 +504,11 @@ abstract contract FHERC20Upgradeable is
     function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
         return _domainSeparatorV4();
     }
+
+    // FHERC20
+
+    function resetIndicatedBalance() external {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        $._indicatedBalances[msg.sender] = 0;
+    }
 }
