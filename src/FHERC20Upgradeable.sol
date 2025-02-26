@@ -5,6 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
@@ -36,6 +37,7 @@ import {FHE, euint128, inEuint128, Utils} from "@fhenixprotocol/cofhe-foundry-mo
 abstract contract FHERC20Upgradeable is
     IFHERC20,
     IFHERC20Errors,
+    UUPSUpgradeable,
     Initializable,
     ContextUpgradeable,
     EIP712Upgradeable,
@@ -101,6 +103,26 @@ abstract contract FHERC20Upgradeable is
     //     );
     bytes32 private constant PERMIT_TYPEHASH = 0x0;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+     * {upgradeTo} and {upgradeToAndCall}.
+     *
+     * Implement this to add upgrade authorization mechanisms.
+     */
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal virtual override {
+        // Add your authorization logic here
+        // For example, you might want to add:
+        // require(msg.sender == owner, "Only owner can upgrade");
+        // TODO: Populate this
+    }
+
     /**
      * @dev Sets the values for {name} and {symbol}.
      *
@@ -111,7 +133,7 @@ abstract contract FHERC20Upgradeable is
         string memory name_,
         string memory symbol_,
         uint8 decimals_
-    ) internal onlyInitializing {
+    ) internal initializer {
         FHERC20Storage storage $ = _getFHERC20Storage();
         $._name = name_;
         $._symbol = symbol_;
