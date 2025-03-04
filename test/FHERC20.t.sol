@@ -32,6 +32,44 @@ contract FHERC20Test is TestSetup {
         assertEq(XXX.isFherc20(), true, "FHERC20 isFherc20 is true");
     }
 
+    function test_indicatedAmountWraparound() public {
+        // Balance 9999 -> wraparound -> 5001
+        XXX.setUserIndicatedBalance(bob, 9999);
+        XXX.mint(bob, 10e18);
+        assertEq(
+            int256(XXX.balanceOf(bob)),
+            _ticksToIndicated(XXX, 5001),
+            "Indicated balance overflow wraparound"
+        );
+
+        // Balance 1 -> wraparound -> 4999
+        XXX.setUserIndicatedBalance(bob, 1);
+        XXX.burn(bob, 1e18);
+        assertEq(
+            int256(XXX.balanceOf(bob)),
+            _ticksToIndicated(XXX, 4999),
+            "Indicated balance underflow wraparound"
+        );
+
+        // Total supply 9999 -> wraparound -> 5001
+        XXX.setTotalIndicatedSupply(9999);
+        XXX.mint(bob, 10e18);
+        assertEq(
+            int256(XXX.totalSupply()),
+            _ticksToIndicated(XXX, 5001),
+            "Total supply overflow wraparound"
+        );
+
+        // Total supply 1 -> wraparound -> 4999
+        XXX.setTotalIndicatedSupply(1);
+        XXX.burn(bob, 1e18);
+        assertEq(
+            int256(XXX.totalSupply()),
+            _ticksToIndicated(XXX, 4999),
+            "Total supply underflow wraparound"
+        );
+    }
+
     function test_Mint() public {
         assertEq(
             XXX.totalSupply(),

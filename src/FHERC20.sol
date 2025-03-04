@@ -62,10 +62,10 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     // `indicatedBalance` is included in the FHERC20 standard as a stop-gap
     // to indicate change when the real encrypted change is not yet implemented
     // in infrastructure like wallets and etherscans.
-    mapping(address account => uint16) private _indicatedBalances;
+    mapping(address account => uint16) internal _indicatedBalances;
     mapping(address account => euint128) private _encBalances;
 
-    uint16 private _indicatedTotalSupply;
+    uint16 internal _indicatedTotalSupply;
     euint128 private _encTotalSupply;
 
     string private _name;
@@ -342,18 +342,16 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
-        if (current == 0) return 5001;
-        if (current < 9999) return current + 1;
-        return current;
+        if (current == 0 || current == 9999) return 5001;
+        return current + 1;
     }
 
     /*
      * @dev Decrements a user's balance indicator by 0.0001
      */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
-        if (value == 0) return 4999;
-        if (value > 1) return value - 1;
-        return value;
+        if (value == 0 || value == 1) return 4999;
+        return value - 1;
     }
 
     /**
