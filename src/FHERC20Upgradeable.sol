@@ -118,7 +118,7 @@ abstract contract FHERC20Upgradeable is
         // Add your authorization logic here
         // For example, you might want to add:
         // require(msg.sender == owner, "Only owner can upgrade");
-        // TODO: Populate this
+        // NOTE: Must be implemented by the FHERC20Upgradeable implementation
     }
 
     /**
@@ -132,15 +132,21 @@ abstract contract FHERC20Upgradeable is
         string memory symbol_,
         uint8 decimals_
     ) internal onlyInitializing {
+        __EIP712_init_unchained(name_, "1");
+        __FHERC20_init_unchained(name_, symbol_, decimals_);
+    }
+
+    function __FHERC20_init_unchained(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_
+    ) internal onlyInitializing {
         FHERC20Storage storage $ = _getFHERC20Storage();
         $._name = name_;
         $._symbol = symbol_;
         $._decimals = decimals_;
         $._indicatorTick = 10 ** (decimals_ - 4);
-        __EIP712_init_unchained(name_, "1");
     }
-
-    function __FHERC20_init_unchained() internal onlyInitializing {}
 
     /**
      * @dev Returns true if the token is a FHERC20.
