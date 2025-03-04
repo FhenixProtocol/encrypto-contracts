@@ -70,7 +70,8 @@ abstract contract FHERC20Upgradeable is
         // in infrastructure like wallets and etherscans.
         mapping(address account => uint16) _indicatedBalances;
         mapping(address account => euint128) _encBalances;
-        uint256 _totalSupply;
+        uint16 _indicatedTotalSupply;
+        euint128 _encTotalSupply;
         string _name;
         string _symbol;
         uint8 _decimals;
@@ -82,7 +83,7 @@ abstract contract FHERC20Upgradeable is
     //         abi.encode(uint256(keccak256("fhenix.storage.FHERC20")) - 1)
     //     ) & ~bytes32(uint256(0xff));
     bytes32 private constant FHERC20StorageLocation =
-        0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00;
+        0xbc8c60a4c847b9f9ad87177ea86cc5fcc3776c8621f569416d2140307d537200;
 
     function _getFHERC20Storage()
         private
@@ -145,7 +146,7 @@ abstract contract FHERC20Upgradeable is
         $._name = name_;
         $._symbol = symbol_;
         $._decimals = decimals_;
-        $._indicatorTick = 10 ** (decimals_ - 4);
+        $._indicatorTick = decimals_ <= 4 ? 1 : 10 ** (decimals_ - 4);
     }
 
     /**
@@ -192,10 +193,20 @@ abstract contract FHERC20Upgradeable is
 
     /**
      * @dev See {IERC20-totalSupply}.
+     *
+     * Returns the indicated total supply of the token.
      */
     function totalSupply() public view virtual returns (uint256) {
         FHERC20Storage storage $ = _getFHERC20Storage();
-        return $._totalSupply;
+        return $._indicatedTotalSupply * $._indicatorTick;
+    }
+
+    /**
+     * @dev Returns the true total supply of the token.
+     */
+    function encTotalSupply() public view virtual returns (euint128) {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        return $._encTotalSupply;
     }
 
     /**
@@ -371,7 +382,7 @@ abstract contract FHERC20Upgradeable is
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(from, to, value, 0);
+        transferred = _update(from, to, value);
     }
 
     /*
@@ -380,18 +391,16 @@ abstract contract FHERC20Upgradeable is
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
-        if (current == 0) return 5001;
-        if (current < 9999) return current + 1;
-        return current;
+        if (current == 0 || current == 9999) return 5001;
+        return current + 1;
     }
 
     /*
      * @dev Decrements a user's balance indicator by 0.0001
      */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
-        if (value == 0) return 4999;
-        if (value > 1) return value - 1;
-        return value;
+        if (value == 0 || value == 1) return 4999;
+        return value - 1;
     }
 
     /**
@@ -407,8 +416,7 @@ abstract contract FHERC20Upgradeable is
     function _update(
         address from,
         address to,
-        euint128 value,
-        uint128 cleartextValue
+        euint128 value
     ) internal virtual returns (euint128 transferred) {
         FHERC20Storage storage $ = _getFHERC20Storage();
 
@@ -429,7 +437,10 @@ abstract contract FHERC20Upgradeable is
         }
 
         if (from == address(0)) {
-            $._totalSupply += cleartextValue;
+            $._indicatedTotalSupply = _incrementIndicator(
+                $._indicatedTotalSupply
+            );
+            $._encTotalSupply = FHE.add($._encTotalSupply, transferred);
         } else {
             $._encBalances[from] = FHE.sub($._encBalances[from], transferred);
             $._indicatedBalances[from] = _decrementIndicator(
@@ -438,7 +449,10 @@ abstract contract FHERC20Upgradeable is
         }
 
         if (to == address(0)) {
-            $._totalSupply -= cleartextValue;
+            $._indicatedTotalSupply = _decrementIndicator(
+                $._indicatedTotalSupply
+            );
+            $._encTotalSupply = FHE.sub($._encTotalSupply, transferred);
         } else {
             $._encBalances[to] = FHE.add($._encBalances[to], transferred);
             $._indicatedBalances[to] = _incrementIndicator(
@@ -457,6 +471,12 @@ abstract contract FHERC20Upgradeable is
             FHE.allow($._encBalances[to], to);
             FHE.allow(transferred, to);
         }
+
+        // Allow the caller to decrypt the transferred amount
+        FHE.allow(transferred, msg.sender);
+
+        // Allow the total supply to be decrypted by anyone
+        FHE.allowGlobal($._encTotalSupply);
 
         emit Transfer(from, to, $._indicatorTick);
         emit EncTransfer(from, to, euint128.unwrap(transferred));
@@ -477,12 +497,7 @@ abstract contract FHERC20Upgradeable is
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(
-            address(0),
-            account,
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(address(0), account, FHE.asEuint128(value));
     }
 
     /**
@@ -500,12 +515,7 @@ abstract contract FHERC20Upgradeable is
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        transferred = _update(
-            account,
-            address(0),
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(account, address(0), FHE.asEuint128(value));
     }
 
     // EIP712 Permit

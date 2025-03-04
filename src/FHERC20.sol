@@ -95,7 +95,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         _symbol = symbol_;
         _decimals = decimals_;
 
-        _indicatorTick = 10 ** (decimals_ - 4);
+        _indicatorTick = decimals_ <= 4 ? 1 : 10 ** (decimals_ - 4);
     }
 
     /**
