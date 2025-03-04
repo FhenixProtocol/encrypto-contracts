@@ -10,12 +10,12 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER");
     error CallerNotMinter(address caller);
 
-    function __FUSD_init(address fusdVault_) public onlyInitializing {
+    function __FUSD_init(address fusdVault_) public initializer {
         __FHERC20_init("FHE US Dollar", "FUSD", 6);
         _grantRole(MINTER_ROLE, fusdVault_);
     }
 
-    function __FUSD_init_unchained() public onlyInitializing {}
+    function __FUSD_init_unchained() public initializer {}
 
     function mint(address receiver, uint128 amount) external returns (bool) {
         if (!hasRole(MINTER_ROLE, msg.sender))

@@ -4,7 +4,7 @@
 pragma solidity ^0.8.25;
 
 import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ConfidentialERC20} from "./ConfidentialERC20.sol";
 import {ConfidentialETH} from "./ConfidentialETH.sol";
 import {IWETH} from "./interfaces/IWETH.sol";

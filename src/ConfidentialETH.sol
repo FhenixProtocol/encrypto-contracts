@@ -15,6 +15,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
+    using SafeERC20 for IWETH;
+
     IWETH public wETH;
 
     constructor(
