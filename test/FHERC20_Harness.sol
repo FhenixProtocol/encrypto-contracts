@@ -19,4 +19,12 @@ contract FHERC20_Harness is FHERC20 {
     function burn(address account, uint128 value) public {
         _burn(account, value);
     }
+
+    function setUserIndicatedBalance(address account, uint16 value) public {
+        _indicatedBalances[account] = value;
+    }
+
+    function setTotalIndicatedSupply(uint16 value) public {
+        _indicatedTotalSupply = value;
+    }
 }

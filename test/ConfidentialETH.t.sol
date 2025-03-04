@@ -6,6 +6,7 @@ import {ERC20_Harness, WETH_Harness} from "./ERC20_Harness.sol";
 import {ConfidentialETH} from "../src/ConfidentialETH.sol";
 import {TestSetup} from "./TestSetup.sol";
 import {IWETH} from "../src/interfaces/IWETH.sol";
+import {inEuint128, euint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 
 contract ConfidentialETHTest is TestSetup {
     WETH_Harness public wETH;
@@ -77,7 +78,16 @@ contract ConfidentialETHTest is TestSetup {
             int256(value)
         );
 
-        assertEq(eETH.totalSupply(), value, "Total supply increases");
+        assertEq(
+            eETH.totalSupply(),
+            uint256(_ticksToIndicated(eETH, 5001)),
+            "Total indicated supply increases"
+        );
+        CFT.assertHashValue(
+            eETH.encTotalSupply(),
+            uint128(value),
+            "Total supply 1e8"
+        );
     }
 
     function test_encryptETH() public {
@@ -109,11 +119,25 @@ contract ConfidentialETHTest is TestSetup {
 
         assertEq(bobEthFinal, bobEthInit - value, "Bob ETH balance decreases");
 
-        assertEq(eETH.totalSupply(), value, "Total supply increases");
+        assertEq(
+            eETH.totalSupply(),
+            uint256(_ticksToIndicated(eETH, 5001)),
+            "Total indicated supply increases"
+        );
+        CFT.assertHashValue(
+            eETH.encTotalSupply(),
+            uint128(value),
+            "Total supply 1e8"
+        );
     }
 
     function test_decrypt() public {
-        assertEq(eETH.totalSupply(), 0, "Total supply init 0");
+        assertEq(
+            euint128.unwrap(eETH.encTotalSupply()),
+            0,
+            "Total supply not initialized (hash is 0)"
+        );
+        assertEq(eETH.totalSupply(), 0, "Total indicated supply init 0");
 
         // Setup
 
@@ -182,7 +206,7 @@ contract ConfidentialETHTest is TestSetup {
             "Claimable amount requested"
         );
         assertEq(claimable[0].to, bob, "Claimable amount to bob");
-        CFT.assertStoredValue(claimableCtHash, value);
+        CFT.assertHashValue(claimableCtHash, value);
 
         // - On decrypt, the amount is not decrypted yet
         assertEq(
@@ -224,6 +248,15 @@ contract ConfidentialETHTest is TestSetup {
 
         assertEq(bobEthFinal, bobEthInit + value, "Bob ETH balance increases");
 
-        assertEq(eETH.totalSupply(), 10e8 - value, "Total supply decreases");
+        assertEq(
+            eETH.totalSupply(),
+            uint256(_ticksToIndicated(eETH, 5000)),
+            "Total indicated supply decreases"
+        );
+        CFT.assertHashValue(
+            eETH.encTotalSupply(),
+            uint128(10e8 - value),
+            "Total supply decreases"
+        );
     }
 }

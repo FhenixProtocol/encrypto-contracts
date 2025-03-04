@@ -62,10 +62,11 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     // `indicatedBalance` is included in the FHERC20 standard as a stop-gap
     // to indicate change when the real encrypted change is not yet implemented
     // in infrastructure like wallets and etherscans.
-    mapping(address account => uint16) private _indicatedBalances;
+    mapping(address account => uint16) internal _indicatedBalances;
     mapping(address account => euint128) private _encBalances;
 
-    uint256 private _totalSupply;
+    uint16 internal _indicatedTotalSupply;
+    euint128 private _encTotalSupply;
 
     string private _name;
     string private _symbol;
@@ -94,7 +95,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         _symbol = symbol_;
         _decimals = decimals_;
 
-        _indicatorTick = 10 ** (decimals_ - 4);
+        _indicatorTick = decimals_ <= 4 ? 1 : 10 ** (decimals_ - 4);
     }
 
     /**
@@ -138,9 +139,18 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
     /**
      * @dev See {IERC20-totalSupply}.
+     *
+     * Returns the indicated total supply.
      */
     function totalSupply() public view virtual returns (uint256) {
-        return _totalSupply;
+        return _indicatedTotalSupply * _indicatorTick;
+    }
+
+    /**
+     * @dev Returns the encrypted total supply.
+     */
+    function encTotalSupply() public view virtual returns (euint128) {
+        return _encTotalSupply;
     }
 
     /**
@@ -267,8 +277,11 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
-        if (to != permit.spender)
-            revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
+        if (msg.sender != permit.spender)
+            revert FHERC20EncTransferFromSpenderMismatch(
+                msg.sender,
+                permit.spender
+            );
 
         if (inValue.hash != permit.value_hash)
             revert FHERC20EncTransferFromValueHashMismatch(
@@ -320,7 +333,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(from, to, value, 0);
+        transferred = _update(from, to, value);
     }
 
     /*
@@ -329,18 +342,16 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
-        if (current == 0) return 5001;
-        if (current < 9999) return current + 1;
-        return current;
+        if (current == 0 || current == 9999) return 5001;
+        return current + 1;
     }
 
     /*
      * @dev Decrements a user's balance indicator by 0.0001
      */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
-        if (value == 0) return 4999;
-        if (value > 1) return value - 1;
-        return value;
+        if (value == 0 || value == 1) return 4999;
+        return value - 1;
     }
 
     /**
@@ -348,16 +359,12 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
      * (or `to`) is the zero address. All customizations to transfers, mints, and burns should be done by overriding
      * this function.
      *
-     * The `cleartextValue` input is used only for totalSupply, and is included when updated is called
-     * by the `_mint` and `_burn` functions, else it is 0.
-     *
-     * Emits a {Transfer} event.
+     * Emits a {Transfer} event and an {EncTransfer} event which includes the encrypted value.
      */
     function _update(
         address from,
         address to,
-        euint128 value,
-        uint128 cleartextValue
+        euint128 value
     ) internal virtual returns (euint128 transferred) {
         // If `value` is greater than the user's encBalance, it is replaced with 0
         // The transaction will succeed, but the amount transferred may be 0
@@ -376,7 +383,8 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         }
 
         if (from == address(0)) {
-            _totalSupply += cleartextValue;
+            _indicatedTotalSupply = _incrementIndicator(_indicatedTotalSupply);
+            _encTotalSupply = FHE.add(_encTotalSupply, transferred);
         } else {
             _encBalances[from] = FHE.sub(_encBalances[from], transferred);
             _indicatedBalances[from] = _decrementIndicator(
@@ -385,7 +393,8 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         }
 
         if (to == address(0)) {
-            _totalSupply -= cleartextValue;
+            _indicatedTotalSupply = _decrementIndicator(_indicatedTotalSupply);
+            _encTotalSupply = FHE.sub(_encTotalSupply, transferred);
         } else {
             _encBalances[to] = FHE.add(_encBalances[to], transferred);
             _indicatedBalances[to] = _incrementIndicator(
@@ -408,6 +417,9 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         // Allow the caller to decrypt the transferred amount
         FHE.allow(transferred, msg.sender);
 
+        // Allow the total supply to be decrypted by anyone
+        FHE.allowGlobal(_encTotalSupply);
+
         emit Transfer(from, to, _indicatorTick);
         emit EncTransfer(from, to, euint128.unwrap(transferred));
     }
@@ -427,12 +439,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(
-            address(0),
-            account,
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(address(0), account, FHE.asEuint128(value));
     }
 
     /**
@@ -450,12 +457,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        transferred = _update(
-            account,
-            address(0),
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(account, address(0), FHE.asEuint128(value));
     }
 
     // EIP712 Permit
@@ -479,5 +481,11 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
         return _domainSeparatorV4();
+    }
+
+    // FHERC20
+
+    function resetIndicatedBalance() external {
+        _indicatedBalances[msg.sender] = 0;
     }
 }

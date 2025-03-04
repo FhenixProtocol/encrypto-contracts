@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {ERC20_Harness} from "./ERC20_Harness.sol";
 import {ConfidentialERC20} from "../src/ConfidentialERC20.sol";
 import {TestSetup} from "./TestSetup.sol";
+import {inEuint128, euint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 
 contract ConfidentialERC20Test is TestSetup {
     ERC20_Harness public wBTC;
@@ -68,7 +69,12 @@ contract ConfidentialERC20Test is TestSetup {
     }
 
     function test_encrypt() public {
-        assertEq(eBTC.totalSupply(), 0, "Total supply init 0");
+        assertEq(eBTC.totalSupply(), 0, "Total indicated supply init 0");
+        assertEq(
+            euint128.unwrap(eBTC.encTotalSupply()),
+            0,
+            "Total supply not initialized (hash is 0)"
+        );
 
         // Mint wBTC
         wBTC.mint(bob, 10e8);
@@ -96,7 +102,16 @@ contract ConfidentialERC20Test is TestSetup {
             int256(value)
         );
 
-        assertEq(eBTC.totalSupply(), value, "Total supply increases");
+        assertEq(
+            eBTC.totalSupply(),
+            uint256(_ticksToIndicated(eBTC, 5001)),
+            "Total indicated supply increases"
+        );
+        CFT.assertHashValue(
+            eBTC.encTotalSupply(),
+            uint128(value),
+            "Total supply 1e8"
+        );
 
         // 2nd TX, indicated + 1, true + 1e8
 
@@ -152,7 +167,11 @@ contract ConfidentialERC20Test is TestSetup {
             false,
             "Claimable amount not claimed"
         );
-        CFT.assertStoredValue(claimableCtHash, value);
+        CFT.assertHashValue(
+            claimableCtHash,
+            uint128(value),
+            "Claimable amount 1e8"
+        );
 
         // Claiming the amount will remove it from the user's claimable set
 
@@ -169,6 +188,15 @@ contract ConfidentialERC20Test is TestSetup {
             -1 * int256(value)
         );
 
-        assertEq(eBTC.totalSupply(), 10e8 - value, "Total supply decreases");
+        assertEq(
+            eBTC.totalSupply(),
+            uint256(_ticksToIndicated(eBTC, 5000)),
+            "Total indicated supply decreases"
+        );
+        CFT.assertHashValue(
+            eBTC.encTotalSupply(),
+            uint128(10e8 - value),
+            "Total supply decreases"
+        );
     }
 }

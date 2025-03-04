@@ -10,12 +10,20 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER");
     error CallerNotMinter(address caller);
 
-    function __FUSD_init(address fusdVault_) public onlyInitializing {
+    function __FUSD_init(address fusdVault_) public initializer {
         __FHERC20_init("FHE US Dollar", "FUSD", 6);
         _grantRole(MINTER_ROLE, fusdVault_);
     }
 
-    function __FUSD_init_unchained() public onlyInitializing {}
+    /**
+     * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+     * {upgradeTo} and {upgradeToAndCall}.
+     *
+     * Implement this to add upgrade authorization mechanisms.
+     */
+    function _authorizeUpgrade(address newImplementation) internal override {
+        _checkRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
 
     function mint(address receiver, uint128 amount) external returns (bool) {
         if (!hasRole(MINTER_ROLE, msg.sender))

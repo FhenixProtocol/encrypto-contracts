@@ -4,13 +4,13 @@
 pragma solidity ^0.8.25;
 
 import {IERC20, IERC20Metadata, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ConfidentialERC20} from "./ConfidentialERC20.sol";
 import {ConfidentialETH} from "./ConfidentialETH.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
-contract RedactedCore is Ownable {
+contract RedactedCore is Ownable2Step {
     using EnumerableMap for EnumerableMap.AddressToAddressMap;
 
     EnumerableMap.AddressToAddressMap private _fherc20Map;
@@ -23,21 +23,27 @@ contract RedactedCore is Ownable {
     mapping(address erc20 => bool isStablecoin) public _stablecoins;
 
     constructor(IWETH wETH_, ConfidentialETH eETH_) Ownable(msg.sender) {
+        if (address(wETH_) == address(0)) revert Invalid_WETH();
+        if (address(eETH_) == address(0)) revert Invalid_eETH();
         wETH = wETH_;
         eETH = eETH_;
     }
 
     event Fherc20Deployed(address indexed erc20, address indexed fherc20);
+    event StablecoinUpdated(address indexed erc20, bool isStablecoin);
+    event Fherc20SymbolUpdated(address indexed fherc20, string symbol);
 
     error Invalid_AlreadyDeployed();
     error Invalid_Stablecoin();
     error Invalid_WETH();
+    error Invalid_eETH();
 
     function updateStablecoin(
         address stablecoin,
         bool isStablecoin
     ) public onlyOwner {
         _stablecoins[stablecoin] = isStablecoin;
+        emit StablecoinUpdated(stablecoin, isStablecoin);
     }
 
     function getFherc20(address erc20) public view returns (address) {
@@ -59,6 +65,7 @@ contract RedactedCore is Ownable {
         string memory updatedSymbol
     ) public onlyOwner {
         fherc20.updateSymbol(updatedSymbol);
+        emit Fherc20SymbolUpdated(address(fherc20), updatedSymbol);
     }
 
     function deployFherc20(IERC20 erc20) public {
