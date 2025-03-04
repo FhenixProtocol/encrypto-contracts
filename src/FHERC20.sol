@@ -333,7 +333,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(from, to, value, 0);
+        transferred = _update(from, to, value);
     }
 
     /*
@@ -364,8 +364,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     function _update(
         address from,
         address to,
-        euint128 value,
-        uint128 cleartextValue
+        euint128 value
     ) internal virtual returns (euint128 transferred) {
         // If `value` is greater than the user's encBalance, it is replaced with 0
         // The transaction will succeed, but the amount transferred may be 0
@@ -440,12 +439,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(
-            address(0),
-            account,
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(address(0), account, FHE.asEuint128(value));
     }
 
     /**
@@ -463,12 +457,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        transferred = _update(
-            account,
-            address(0),
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(account, address(0), FHE.asEuint128(value));
     }
 
     // EIP712 Permit
