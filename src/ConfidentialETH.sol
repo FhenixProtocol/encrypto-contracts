@@ -9,6 +9,7 @@ import {IWETH} from "./interfaces/IWETH.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ConfidentialClaim} from "./ConfidentialClaim.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -65,7 +66,7 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
 
     function encryptETH(address to) public payable {
         if (to == address(0)) revert InvalidRecipient();
-        _mint(to, uint128(msg.value));
+        _mint(to, SafeCast.toUint128(msg.value));
         emit EncryptedETH(msg.sender, to, msg.value);
     }
 

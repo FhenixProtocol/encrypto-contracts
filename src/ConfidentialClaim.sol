@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IFHERC20, FHERC20} from "./FHERC20.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {console} from "forge-std/console.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 contract ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -54,7 +54,7 @@ contract ConfidentialClaim {
         if (claim.claimed) revert AlreadyClaimed();
 
         // Get the decrypted amount (reverts if the amount is not decrypted yet)
-        uint128 amount = uint128(FHE.getDecryptResult(ctHash));
+        uint128 amount = SafeCast.toUint128(FHE.getDecryptResult(ctHash));
 
         // Update the claim
         claim.decryptedAmount = amount;
@@ -68,7 +68,7 @@ contract ConfidentialClaim {
     function getClaim(uint256 ctHash) public view returns (Claim memory) {
         Claim memory _claim = _claims[ctHash];
         (uint256 amount, bool decrypted) = FHE.getDecryptResultSafe(ctHash);
-        _claim.decryptedAmount = uint128(amount);
+        _claim.decryptedAmount = SafeCast.toUint128(amount);
         _claim.decrypted = decrypted;
         return _claim;
     }
@@ -81,7 +81,7 @@ contract ConfidentialClaim {
             (uint256 amount, bool decrypted) = FHE.getDecryptResultSafe(
                 ctHashes[i]
             );
-            userClaims[i].decryptedAmount = uint128(amount);
+            userClaims[i].decryptedAmount = SafeCast.toUint128(amount);
             userClaims[i].decrypted = decrypted;
         }
         return userClaims;
