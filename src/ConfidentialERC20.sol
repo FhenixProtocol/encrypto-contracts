@@ -9,9 +9,11 @@ import {IFHERC20, FHERC20} from "./FHERC20.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ConfidentialClaim} from "./ConfidentialClaim.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
+    using SafeERC20 for IERC20;
 
     IERC20 private immutable _erc20;
     string private _symbol;
@@ -92,7 +94,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
 
     function encrypt(address to, uint128 value) public {
         if (to == address(0)) revert InvalidRecipient();
-        IERC20(_erc20).transferFrom(msg.sender, address(this), value);
+        _erc20.safeTransferFrom(msg.sender, address(this), value);
         _mint(to, value);
         emit EncryptedERC20(msg.sender, to, value);
     }
@@ -113,7 +115,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
         Claim memory claim = _handleClaim(ctHash);
 
         // Send the ERC20 to the recipient
-        IERC20(_erc20).transfer(claim.to, claim.decryptedAmount);
+        _erc20.safeTransfer(claim.to, claim.decryptedAmount);
         emit ClaimedDecryptedERC20(msg.sender, claim.to, claim.decryptedAmount);
     }
 }

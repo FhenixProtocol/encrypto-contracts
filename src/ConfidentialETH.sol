@@ -10,10 +10,11 @@ import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ConfidentialClaim} from "./ConfidentialClaim.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
-
+    using SafeERC20 for IERC20;
     IWETH public wETH;
 
     constructor(
@@ -58,7 +59,7 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
 
     function encryptWETH(address to, uint128 value) public {
         if (to == address(0)) revert InvalidRecipient();
-        wETH.transferFrom(msg.sender, address(this), value);
+        wETH.safeTransferFrom(msg.sender, address(this), value);
         wETH.withdraw(value);
         _mint(to, value);
         emit EncryptedWETH(msg.sender, to, value);
