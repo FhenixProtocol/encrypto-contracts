@@ -32,6 +32,22 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
 
     fallback() external payable {}
 
+    event EncryptedWETH(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event EncryptedETH(address indexed from, address indexed to, uint256 value);
+    event DecryptedETH(address indexed from, address indexed to, uint128 value);
+    event ClaimedDecryptedETH(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+
+    /**
+     * @dev The ETH transfer failed.
+     */
     error ETHTransferFailed();
 
     /**
@@ -44,11 +60,13 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
         wETH.transferFrom(msg.sender, address(this), value);
         wETH.withdraw(value);
         _mint(to, value);
+        emit EncryptedWETH(msg.sender, to, value);
     }
 
     function encryptETH(address to) public payable {
         if (to == address(0)) revert InvalidRecipient();
         _mint(to, uint128(msg.value));
+        emit EncryptedETH(msg.sender, to, msg.value);
     }
 
     function decrypt(address to, uint128 value) public {
@@ -56,6 +74,7 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
         _createClaim(to, value, burned);
+        emit DecryptedETH(msg.sender, to, value);
     }
 
     /**
@@ -68,5 +87,7 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
         // Send the ETH to the recipient
         (bool sent, ) = claim.to.call{value: claim.decryptedAmount}("");
         if (!sent) revert ETHTransferFailed();
+
+        emit ClaimedDecryptedETH(msg.sender, claim.to, claim.decryptedAmount);
     }
 }

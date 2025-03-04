@@ -30,16 +30,20 @@ contract RedactedCore is Ownable {
     }
 
     event Fherc20Deployed(address indexed erc20, address indexed fherc20);
+    event StablecoinUpdated(address indexed erc20, bool isStablecoin);
+    event Fherc20SymbolUpdated(address indexed fherc20, string symbol);
 
     error Invalid_AlreadyDeployed();
     error Invalid_Stablecoin();
     error Invalid_WETH();
     error Invalid_eETH();
+
     function updateStablecoin(
         address stablecoin,
         bool isStablecoin
     ) public onlyOwner {
         _stablecoins[stablecoin] = isStablecoin;
+        emit StablecoinUpdated(stablecoin, isStablecoin);
     }
 
     function getFherc20(address erc20) public view returns (address) {
@@ -61,6 +65,7 @@ contract RedactedCore is Ownable {
         string memory updatedSymbol
     ) public onlyOwner {
         fherc20.updateSymbol(updatedSymbol);
+        emit Fherc20SymbolUpdated(address(fherc20), updatedSymbol);
     }
 
     function deployFherc20(IERC20 erc20) public {

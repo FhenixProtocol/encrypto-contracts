@@ -16,6 +16,23 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     IERC20 private immutable _erc20;
     string private _symbol;
 
+    event EncryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event DecryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event ClaimedDecryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event SymbolUpdated(string symbol);
+
     /**
      * @dev The erc20 token couldn't be wrapped.
      */
@@ -63,6 +80,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
 
     function updateSymbol(string memory updatedSymbol) public onlyOwner {
         _symbol = updatedSymbol;
+        emit SymbolUpdated(updatedSymbol);
     }
 
     /**
@@ -76,6 +94,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
         if (to == address(0)) revert InvalidRecipient();
         IERC20(_erc20).transferFrom(msg.sender, address(this), value);
         _mint(to, value);
+        emit EncryptedERC20(msg.sender, to, value);
     }
 
     function decrypt(address to, uint128 value) public {
@@ -83,6 +102,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
         _createClaim(to, value, burned);
+        emit DecryptedERC20(msg.sender, to, value);
     }
 
     /**
@@ -94,5 +114,6 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
 
         // Send the ERC20 to the recipient
         IERC20(_erc20).transfer(claim.to, claim.decryptedAmount);
+        emit ClaimedDecryptedERC20(msg.sender, claim.to, claim.decryptedAmount);
     }
 }
