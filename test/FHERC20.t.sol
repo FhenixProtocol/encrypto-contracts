@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import {console} from "forge-std/Test.sol";
 import {FHERC20} from "./FHERC20_Harness.sol";
 import {TestSetup} from "./TestSetup.sol";
 import {IFHERC20} from "../src/interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "../src/interfaces/IFHERC20Errors.sol";
-import {inEuint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
+import {inEuint128, euint128} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
+
 contract FHERC20Test is TestSetup {
     function setUp() public override {
         super.setUp();
@@ -31,7 +33,16 @@ contract FHERC20Test is TestSetup {
     }
 
     function test_Mint() public {
-        assertEq(XXX.totalSupply(), 0, "Total supply init 0");
+        assertEq(
+            XXX.totalSupply(),
+            uint256(_ticksToIndicated(XXX, 0)),
+            "Total indicated supply init 0"
+        );
+        assertEq(
+            euint128.unwrap(XXX.encTotalSupply()),
+            0,
+            "Total supply not initialized (hash is 0)"
+        );
 
         // 1st TX, indicated + 5001, true + 1e18
 
@@ -49,7 +60,12 @@ contract FHERC20Test is TestSetup {
             int128(value)
         );
 
-        assertEq(XXX.totalSupply(), value, "Total supply increases");
+        assertEq(
+            XXX.totalSupply(),
+            uint256(_ticksToIndicated(XXX, 5001)),
+            "Total indicated supply increases"
+        );
+        CFT.assertHashValue(XXX.encTotalSupply(), value, "Total supply 1e18");
 
         // 2nd TX, indicated + 1, true + 1e18
 
@@ -76,7 +92,12 @@ contract FHERC20Test is TestSetup {
 
         // 1st TX, indicated - 1, true - 1e18
 
-        assertEq(XXX.totalSupply(), 10e18, "Total supply init 10e18");
+        assertEq(
+            XXX.totalSupply(),
+            uint256(_ticksToIndicated(XXX, 5001)),
+            "Total indicated supply init .5001"
+        );
+        CFT.assertHashValue(XXX.encTotalSupply(), 10e18);
 
         _prepExpectFHERC20BalancesChange(XXX, bob);
 
@@ -89,8 +110,13 @@ contract FHERC20Test is TestSetup {
             -1 * _ticksToIndicated(XXX, 1),
             -1 * 1e18
         );
+        CFT.assertHashValue(XXX.encTotalSupply(), 9e18);
 
-        assertEq(XXX.totalSupply(), 9e18, "Total supply reduced by 1e18");
+        assertEq(
+            XXX.totalSupply(),
+            uint256(_ticksToIndicated(XXX, 5000)),
+            "Total indicated supply reduced to .5000"
+        );
 
         // Revert
 

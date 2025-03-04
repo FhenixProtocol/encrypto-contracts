@@ -65,7 +65,8 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
     mapping(address account => uint16) private _indicatedBalances;
     mapping(address account => euint128) private _encBalances;
 
-    uint256 private _totalSupply;
+    uint16 private _indicatedTotalSupply;
+    euint128 private _encTotalSupply;
 
     string private _name;
     string private _symbol;
@@ -138,9 +139,18 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
     /**
      * @dev See {IERC20-totalSupply}.
+     *
+     * Returns the indicated total supply.
      */
     function totalSupply() public view virtual returns (uint256) {
-        return _totalSupply;
+        return _indicatedTotalSupply * _indicatorTick;
+    }
+
+    /**
+     * @dev Returns the encrypted total supply.
+     */
+    function encTotalSupply() public view virtual returns (euint128) {
+        return _encTotalSupply;
     }
 
     /**
@@ -351,10 +361,7 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
      * (or `to`) is the zero address. All customizations to transfers, mints, and burns should be done by overriding
      * this function.
      *
-     * The `cleartextValue` input is used only for totalSupply, and is included when updated is called
-     * by the `_mint` and `_burn` functions, else it is 0.
-     *
-     * Emits a {Transfer} event.
+     * Emits a {Transfer} event and an {EncTransfer} event which includes the encrypted value.
      */
     function _update(
         address from,
@@ -379,7 +386,8 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         }
 
         if (from == address(0)) {
-            _totalSupply += cleartextValue;
+            _indicatedTotalSupply = _incrementIndicator(_indicatedTotalSupply);
+            _encTotalSupply = FHE.add(_encTotalSupply, transferred);
         } else {
             _encBalances[from] = FHE.sub(_encBalances[from], transferred);
             _indicatedBalances[from] = _decrementIndicator(
@@ -388,7 +396,8 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
         }
 
         if (to == address(0)) {
-            _totalSupply -= cleartextValue;
+            _indicatedTotalSupply = _decrementIndicator(_indicatedTotalSupply);
+            _encTotalSupply = FHE.sub(_encTotalSupply, transferred);
         } else {
             _encBalances[to] = FHE.add(_encBalances[to], transferred);
             _indicatedBalances[to] = _incrementIndicator(
@@ -410,6 +419,9 @@ abstract contract FHERC20 is IFHERC20, IFHERC20Errors, Context, EIP712, Nonces {
 
         // Allow the caller to decrypt the transferred amount
         FHE.allow(transferred, msg.sender);
+
+        // Allow the total supply to be decrypted by anyone
+        FHE.allowGlobal(_encTotalSupply);
 
         emit Transfer(from, to, _indicatorTick);
         emit EncTransfer(from, to, euint128.unwrap(transferred));
