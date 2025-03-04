@@ -23,6 +23,8 @@ contract RedactedCore is Ownable {
     mapping(address erc20 => bool isStablecoin) public _stablecoins;
 
     constructor(IWETH wETH_, ConfidentialETH eETH_) Ownable(msg.sender) {
+        if (address(wETH_) == address(0)) revert Invalid_WETH();
+        if (address(eETH_) == address(0)) revert Invalid_eETH();
         wETH = wETH_;
         eETH = eETH_;
     }
@@ -32,7 +34,7 @@ contract RedactedCore is Ownable {
     error Invalid_AlreadyDeployed();
     error Invalid_Stablecoin();
     error Invalid_WETH();
-
+    error Invalid_eETH();
     function updateStablecoin(
         address stablecoin,
         bool isStablecoin

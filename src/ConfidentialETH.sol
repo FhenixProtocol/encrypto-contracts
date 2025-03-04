@@ -34,17 +34,25 @@ contract ConfidentialETH is FHERC20, Ownable, ConfidentialClaim {
 
     error ETHTransferFailed();
 
+    /**
+     * @dev The recipient is the zero address.
+     */
+    error InvalidRecipient();
+
     function encryptWETH(address to, uint128 value) public {
+        if (to == address(0)) revert InvalidRecipient();
         wETH.transferFrom(msg.sender, address(this), value);
         wETH.withdraw(value);
         _mint(to, value);
     }
 
     function encryptETH(address to) public payable {
+        if (to == address(0)) revert InvalidRecipient();
         _mint(to, uint128(msg.value));
     }
 
     function decrypt(address to, uint128 value) public {
+        if (to == address(0)) revert InvalidRecipient();
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
         _createClaim(to, value, burned);

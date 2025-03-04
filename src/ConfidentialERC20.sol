@@ -21,6 +21,11 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
      */
     error FHERC20InvalidErc20(address token);
 
+    /**
+     * @dev The recipient is the zero address.
+     */
+    error InvalidRecipient();
+
     constructor(
         IERC20 erc20_,
         string memory symbolOverride_
@@ -68,11 +73,13 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     }
 
     function encrypt(address to, uint128 value) public {
+        if (to == address(0)) revert InvalidRecipient();
         IERC20(_erc20).transferFrom(msg.sender, address(this), value);
         _mint(to, value);
     }
 
     function decrypt(address to, uint128 value) public {
+        if (to == address(0)) revert InvalidRecipient();
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
         _createClaim(to, value, burned);
