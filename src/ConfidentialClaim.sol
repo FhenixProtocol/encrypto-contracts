@@ -10,7 +10,7 @@ import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
-contract ConfidentialClaim {
+abstract contract ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
 
     struct Claim {
