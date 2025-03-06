@@ -5,7 +5,7 @@ pragma solidity ^0.8.25;
 
 import {IFHERC20} from "./interfaces/IFHERC20.sol";
 import {IFHERC20Errors} from "./interfaces/IFHERC20Errors.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable, Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
@@ -39,7 +39,8 @@ abstract contract FHERC20Upgradeable is
     Initializable,
     ContextUpgradeable,
     EIP712Upgradeable,
-    NoncesUpgradeable
+    NoncesUpgradeable,
+    UUPSUpgradeable
 {
     struct FHERC20Storage {
         // NOTE: `indicatedBalances` are intended to indicate movement and change
@@ -69,7 +70,8 @@ abstract contract FHERC20Upgradeable is
         // in infrastructure like wallets and etherscans.
         mapping(address account => uint16) _indicatedBalances;
         mapping(address account => euint128) _encBalances;
-        uint256 _totalSupply;
+        uint16 _indicatedTotalSupply;
+        euint128 _encTotalSupply;
         string _name;
         string _symbol;
         uint8 _decimals;
@@ -81,7 +83,7 @@ abstract contract FHERC20Upgradeable is
     //         abi.encode(uint256(keccak256("fhenix.storage.FHERC20")) - 1)
     //     ) & ~bytes32(uint256(0xff));
     bytes32 private constant FHERC20StorageLocation =
-        0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00;
+        0xbc8c60a4c847b9f9ad87177ea86cc5fcc3776c8621f569416d2140307d537200;
 
     function _getFHERC20Storage()
         private
@@ -95,11 +97,30 @@ abstract contract FHERC20Upgradeable is
 
     // EIP712 Permit
 
-    // bytes32 private constant PERMIT_TYPEHASH =
-    //     keccak256(
-    //         "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
-    //     );
-    bytes32 private constant PERMIT_TYPEHASH = 0x0;
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value_hash,uint256 nonce,uint256 deadline)"
+        );
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
+     * {upgradeTo} and {upgradeToAndCall}.
+     *
+     * Implement this to add upgrade authorization mechanisms.
+     */
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal virtual override {
+        // Add your authorization logic here
+        // For example, you might want to add:
+        // require(msg.sender == owner, "Only owner can upgrade");
+        // NOTE: Must be implemented by the FHERC20Upgradeable implementation
+    }
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -112,15 +133,21 @@ abstract contract FHERC20Upgradeable is
         string memory symbol_,
         uint8 decimals_
     ) internal onlyInitializing {
+        __EIP712_init_unchained(name_, "1");
+        __FHERC20_init_unchained(name_, symbol_, decimals_);
+    }
+
+    function __FHERC20_init_unchained(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_
+    ) internal onlyInitializing {
         FHERC20Storage storage $ = _getFHERC20Storage();
         $._name = name_;
         $._symbol = symbol_;
         $._decimals = decimals_;
-        $._indicatorTick = 10 ** (decimals_ - 4);
-        __EIP712_init_unchained(name_, "1");
+        $._indicatorTick = decimals_ <= 4 ? 1 : 10 ** (decimals_ - 4);
     }
-
-    function __FHERC20_init_unchained() internal onlyInitializing {}
 
     /**
      * @dev Returns true if the token is a FHERC20.
@@ -166,10 +193,20 @@ abstract contract FHERC20Upgradeable is
 
     /**
      * @dev See {IERC20-totalSupply}.
+     *
+     * Returns the indicated total supply of the token.
      */
     function totalSupply() public view virtual returns (uint256) {
         FHERC20Storage storage $ = _getFHERC20Storage();
-        return $._totalSupply;
+        return $._indicatedTotalSupply * $._indicatorTick;
+    }
+
+    /**
+     * @dev Returns the true total supply of the token.
+     */
+    function encTotalSupply() public view virtual returns (euint128) {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        return $._encTotalSupply;
     }
 
     /**
@@ -292,7 +329,7 @@ abstract contract FHERC20Upgradeable is
 
         if (from != permit.owner)
             revert FHERC20EncTransferFromOwnerMismatch(from, permit.owner);
-        if (to != permit.spender)
+        if (msg.sender != permit.spender)
             revert FHERC20EncTransferFromSpenderMismatch(to, permit.spender);
 
         if (inValue.hash != permit.value_hash)
@@ -345,7 +382,7 @@ abstract contract FHERC20Upgradeable is
         if (to == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(from, to, value, 0);
+        transferred = _update(from, to, value);
     }
 
     /*
@@ -354,18 +391,16 @@ abstract contract FHERC20Upgradeable is
     function _incrementIndicator(
         uint16 current
     ) internal pure returns (uint16) {
-        if (current == 0) return 5001;
-        if (current < 9999) return current + 1;
-        return current;
+        if (current == 0 || current == 9999) return 5001;
+        return current + 1;
     }
 
     /*
      * @dev Decrements a user's balance indicator by 0.0001
      */
     function _decrementIndicator(uint16 value) internal pure returns (uint16) {
-        if (value == 0) return 4999;
-        if (value > 1) return value - 1;
-        return value;
+        if (value == 0 || value == 1) return 4999;
+        return value - 1;
     }
 
     /**
@@ -381,8 +416,7 @@ abstract contract FHERC20Upgradeable is
     function _update(
         address from,
         address to,
-        euint128 value,
-        uint128 cleartextValue
+        euint128 value
     ) internal virtual returns (euint128 transferred) {
         FHERC20Storage storage $ = _getFHERC20Storage();
 
@@ -403,7 +437,10 @@ abstract contract FHERC20Upgradeable is
         }
 
         if (from == address(0)) {
-            $._totalSupply += cleartextValue;
+            $._indicatedTotalSupply = _incrementIndicator(
+                $._indicatedTotalSupply
+            );
+            $._encTotalSupply = FHE.add($._encTotalSupply, transferred);
         } else {
             $._encBalances[from] = FHE.sub($._encBalances[from], transferred);
             $._indicatedBalances[from] = _decrementIndicator(
@@ -412,9 +449,12 @@ abstract contract FHERC20Upgradeable is
         }
 
         if (to == address(0)) {
-            $._totalSupply -= cleartextValue;
+            $._indicatedTotalSupply = _decrementIndicator(
+                $._indicatedTotalSupply
+            );
+            $._encTotalSupply = FHE.sub($._encTotalSupply, transferred);
         } else {
-            $._encBalances[from] = FHE.add($._encBalances[from], transferred);
+            $._encBalances[to] = FHE.add($._encBalances[to], transferred);
             $._indicatedBalances[to] = _incrementIndicator(
                 $._indicatedBalances[to]
             );
@@ -431,6 +471,12 @@ abstract contract FHERC20Upgradeable is
             FHE.allow($._encBalances[to], to);
             FHE.allow(transferred, to);
         }
+
+        // Allow the caller to decrypt the transferred amount
+        FHE.allow(transferred, msg.sender);
+
+        // Allow the total supply to be decrypted by anyone
+        FHE.allowGlobal($._encTotalSupply);
 
         emit Transfer(from, to, $._indicatorTick);
         emit EncTransfer(from, to, euint128.unwrap(transferred));
@@ -451,12 +497,7 @@ abstract contract FHERC20Upgradeable is
         if (account == address(0)) {
             revert ERC20InvalidReceiver(address(0));
         }
-        transferred = _update(
-            address(0),
-            account,
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(address(0), account, FHE.asEuint128(value));
     }
 
     /**
@@ -474,12 +515,7 @@ abstract contract FHERC20Upgradeable is
         if (account == address(0)) {
             revert ERC20InvalidSender(address(0));
         }
-        transferred = _update(
-            account,
-            address(0),
-            FHE.asEuint128(value),
-            value
-        );
+        transferred = _update(account, address(0), FHE.asEuint128(value));
     }
 
     // EIP712 Permit
@@ -503,5 +539,12 @@ abstract contract FHERC20Upgradeable is
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view virtual returns (bytes32) {
         return _domainSeparatorV4();
+    }
+
+    // FHERC20
+
+    function resetIndicatedBalance() external {
+        FHERC20Storage storage $ = _getFHERC20Storage();
+        $._indicatedBalances[msg.sender] = 0;
     }
 }

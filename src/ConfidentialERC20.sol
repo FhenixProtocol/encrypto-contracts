@@ -9,17 +9,41 @@ import {IFHERC20, FHERC20} from "./FHERC20.sol";
 import {euint128, FHE} from "@fhenixprotocol/cofhe-foundry-mocks/FHE.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ConfidentialClaim} from "./ConfidentialClaim.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     using EnumerableSet for EnumerableSet.UintSet;
+    using SafeERC20 for IERC20;
 
     IERC20 private immutable _erc20;
     string private _symbol;
+
+    event EncryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event DecryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event ClaimedDecryptedERC20(
+        address indexed from,
+        address indexed to,
+        uint128 value
+    );
+    event SymbolUpdated(string symbol);
 
     /**
      * @dev The erc20 token couldn't be wrapped.
      */
     error FHERC20InvalidErc20(address token);
+
+    /**
+     * @dev The recipient is the zero address.
+     */
+    error InvalidRecipient();
 
     constructor(
         IERC20 erc20_,
@@ -58,6 +82,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
 
     function updateSymbol(string memory updatedSymbol) public onlyOwner {
         _symbol = updatedSymbol;
+        emit SymbolUpdated(updatedSymbol);
     }
 
     /**
@@ -68,14 +93,18 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
     }
 
     function encrypt(address to, uint128 value) public {
-        IERC20(_erc20).transferFrom(msg.sender, address(this), value);
+        if (to == address(0)) revert InvalidRecipient();
+        _erc20.safeTransferFrom(msg.sender, address(this), value);
         _mint(to, value);
+        emit EncryptedERC20(msg.sender, to, value);
     }
 
     function decrypt(address to, uint128 value) public {
+        if (to == address(0)) revert InvalidRecipient();
         euint128 burned = _burn(msg.sender, value);
         FHE.decrypt(burned);
         _createClaim(to, value, burned);
+        emit DecryptedERC20(msg.sender, to, value);
     }
 
     /**
@@ -86,6 +115,7 @@ contract ConfidentialERC20 is FHERC20, Ownable, ConfidentialClaim {
         Claim memory claim = _handleClaim(ctHash);
 
         // Send the ERC20 to the recipient
-        IERC20(_erc20).transfer(claim.to, claim.decryptedAmount);
+        _erc20.safeTransfer(claim.to, claim.decryptedAmount);
+        emit ClaimedDecryptedERC20(msg.sender, claim.to, claim.decryptedAmount);
     }
 }
