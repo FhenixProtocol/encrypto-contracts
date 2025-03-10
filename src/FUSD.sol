@@ -77,7 +77,9 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         __FUSD_init_unchained(fusdVault_);
     }
 
-    function __FUSD_init_unchained(address fusdVault_) internal initializer {
+    function __FUSD_init_unchained(
+        address fusdVault_
+    ) internal onlyInitializing {
         FUSDStorage storage $ = _getFUSDStorage();
 
         $.fusdVault = fusdVault_;
