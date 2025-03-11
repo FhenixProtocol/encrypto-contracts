@@ -61,6 +61,9 @@ abstract contract ConfidentialClaim {
         claim.decrypted = true;
         claim.claimed = true;
 
+        // Update the claim in storage
+        _claims[ctHash] = claim;
+
         // Remove the claimable amount from the user's claimable set
         _userClaims[claim.to].remove(ctHash);
     }

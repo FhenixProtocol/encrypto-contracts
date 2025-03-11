@@ -61,7 +61,7 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         mapping(address => EnumerableSet.UintSet) userClaims;
     }
 
-    bytes32 private constant MINTER_ROLE = keccak256("MINTER");
+    bytes32 private constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     // bytes32 private constant FUSDStorageLocation =
     //     keccak256(
@@ -76,14 +76,9 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         }
     }
 
-    function __FUSD_init(address fusdVault_) public initializer {
+    function initialize(address fusdVault_) public initializer {
         __FHERC20_init("FHE US Dollar", "FUSD", 6);
-        __FUSD_init_unchained(fusdVault_);
-    }
 
-    function __FUSD_init_unchained(
-        address fusdVault_
-    ) internal onlyInitializing {
         FUSDStorage storage $ = _getFUSDStorage();
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -205,6 +200,9 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         claim.decryptedAmount = amount;
         claim.decrypted = true;
         claim.claimed = true;
+
+        // Update the claim in storage
+        $.claims[ctHash] = claim;
 
         // Remove the claimable amount from the user's claimable set
         $.userClaims[claim.to].remove(ctHash);
