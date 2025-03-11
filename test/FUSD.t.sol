@@ -350,8 +350,7 @@ contract FUSDTest is TestSetup {
 
         // Upgrade to new implementation
         vm.prank(address(this)); // Default admin role
-        console.log("Upgrading to new implementation");
-        fusd.upgradeToAndCall(address(newImplementation), initData);
+        fusd.upgradeToAndCall(address(newImplementation), "");
 
         // Verify functionality still works after upgrade
         uint128 mintAmount = 1000000; // 1 FUSD
@@ -362,50 +361,8 @@ contract FUSDTest is TestSetup {
         assertTrue(aliceBalance > 0, "Alice balance updated after upgrade");
 
         // Verify new implementation has correct admin role
-        assertTrue(
-            newImplementation.hasRole(
-                newImplementation.DEFAULT_ADMIN_ROLE(),
-                address(this)
-            )
-        );
+        assertTrue(fusd.hasRole(fusd.DEFAULT_ADMIN_ROLE(), address(this)));
     }
-
-    // function test_UpdatedVaultAdminSetCorrectly() public {
-    //     // Deploy a new instance without our fixes
-    //     FUSD missingAdminImplementation = new FUSD();
-
-    //     // Deploy proxy with implementation
-    //     bytes memory initData = abi.encodeWithSelector(
-    //         FUSD.initialize.selector,
-    //         address(vault)
-    //     );
-    //     ERC1967Proxy proxy = new ERC1967Proxy(
-    //         address(missingAdminImplementation),
-    //         initData
-    //     );
-    //     FUSD missingAdminFUSD = FUSD(address(proxy));
-
-    //     // Try to call an admin function - this will fail because no admin role was granted
-    //     address newVault = address(0x123);
-
-    //     // The deployer doesn't have admin role, so this will revert
-    //     vm.expectRevert(
-    //         abi.encodeWithSelector(FUSD.CallerNotAdmin.selector, address(this))
-    //     );
-    //     missingAdminFUSD.updateFUSDVault(newVault);
-
-    //     // No way to upgrade the contract either
-    //     vm.expectRevert();
-    //     missingAdminFUSD.upgradeToAndCall(address(123), "");
-
-    //     // Verify that no one has admin role
-    //     assertTrue(
-    //         missingAdminFUSD.hasRole(
-    //             missingAdminFUSD.DEFAULT_ADMIN_ROLE(),
-    //             address(this)
-    //         )
-    //     );
-    // }
 
     function test_MintWithOldVaultRevertsAfterUpdate() public {
         address charlie = makeAddr("charlie");
