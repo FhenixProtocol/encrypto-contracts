@@ -37,6 +37,10 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         address indexed to,
         uint128 amount
     );
+    event FUSDVaultUpdated(
+        address indexed caller,
+        address indexed newFUSDVault
+    );
 
     struct Claim {
         uint256 ctHash;
@@ -89,31 +93,50 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
     }
 
     /**
+     *  @dev Modifier that reverts if the caller is not an admin
+     */
+    modifier onlyAdmin() {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender))
+            revert CallerNotAdmin(msg.sender);
+        _;
+    }
+
+    /**
+     *  @dev Modifier that reverts if the caller is not a minter
+     */
+    modifier onlyMinter() {
+        if (!hasRole(MINTER_ROLE, msg.sender))
+            revert CallerNotMinter(msg.sender);
+        _;
+    }
+
+    /**
      * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract. Called by
      * {upgradeTo} and {upgradeToAndCall}.
      *
      * Implement this to add upgrade authorization mechanisms.
      */
-    function _authorizeUpgrade(address newImplementation) internal override {
-        _checkRole(DEFAULT_ADMIN_ROLE, msg.sender);
-    }
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyAdmin {}
 
     // VAULT FUNCTIONS
 
-    function mint(address to, uint128 amount) external {
-        if (!hasRole(MINTER_ROLE, msg.sender))
-            revert CallerNotMinter(msg.sender);
+    function mint(address to, uint128 amount) external onlyMinter {
         if (to == address(0)) revert InvalidRecipient();
 
         _mint(to, amount);
+
         emit MintedFUSD(msg.sender, to, amount);
     }
 
     function redeem(address to, uint128 amount) external {
         if (to == address(0)) revert InvalidRecipient();
+
         euint128 burned = _burn(msg.sender, amount);
         FHE.decrypt(burned);
         _createClaim(to, amount, burned);
+
         emit RedeemedFUSD(msg.sender, to, amount);
     }
 
@@ -123,15 +146,13 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
 
         // Call the vault with the redeemed amount
         IFUSDVault($.fusdVault).redeem(claim.to, claim.decryptedAmount);
+
         emit ClaimedRedeemedFUSD(msg.sender, claim.to, claim.decryptedAmount);
     }
 
     // ADMIN FUNCTIONS
 
-    function updateFUSDVault(address fusdVault_) external {
-        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender))
-            revert CallerNotAdmin(msg.sender);
-
+    function updateFUSDVault(address fusdVault_) external onlyAdmin {
         if (fusdVault_ == address(0)) revert InvalidFUSDVault();
 
         FUSDStorage storage $ = _getFUSDStorage();
@@ -142,6 +163,8 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         // Update the vault address and grant the new minter role
         $.fusdVault = fusdVault_;
         _grantRole(MINTER_ROLE, fusdVault_);
+
+        emit FUSDVaultUpdated(msg.sender, fusdVault_);
     }
 
     // CLAIM FUNCTIONS
