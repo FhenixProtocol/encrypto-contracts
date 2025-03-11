@@ -133,7 +133,7 @@ abstract contract FHERC20Upgradeable is
         string memory symbol_,
         uint8 decimals_
     ) internal onlyInitializing {
-        __EIP712_init_unchained(name_, "1");
+        __EIP712_init(name_, "1");
         __FHERC20_init_unchained(name_, symbol_, decimals_);
     }
 

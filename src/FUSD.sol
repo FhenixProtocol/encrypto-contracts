@@ -82,8 +82,9 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
     ) internal onlyInitializing {
         FUSDStorage storage $ = _getFUSDStorage();
 
-        $.fusdVault = fusdVault_;
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
+        $.fusdVault = fusdVault_;
         _grantRole(MINTER_ROLE, fusdVault_);
     }
 
