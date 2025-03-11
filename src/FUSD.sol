@@ -135,7 +135,13 @@ contract FUSD is FHERC20Upgradeable, AccessControlUpgradeable {
         if (fusdVault_ == address(0)) revert InvalidFUSDVault();
 
         FUSDStorage storage $ = _getFUSDStorage();
+
+        // Revoke the old minter role
+        _revokeRole(MINTER_ROLE, $.fusdVault);
+
+        // Update the vault address and grant the new minter role
         $.fusdVault = fusdVault_;
+        _grantRole(MINTER_ROLE, fusdVault_);
     }
 
     // CLAIM FUNCTIONS
